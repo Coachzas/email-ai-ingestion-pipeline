@@ -21,10 +21,11 @@ async function fetchEmails() {
     await client.mailboxOpen('INBOX');
     console.log('📥 IMAP connected');
 
-    //
+    // ดึง UID ของอีเมลทั้งหมดในกล่องจดหมาย
     const uids = await client.search({ all: true });
     const lastUids = uids.slice(-5);
 
+    // ดึงอีเมลทีละฉบับตาม UID ที่ได้มา
     for (const uid of lastUids) {
         const msg = await client.fetchOne(uid, { source: true });
         const parsed = await simpleParser(msg.source); // simpleParser จะทำหน้าที่ ถอดรหัส ให้กลายเป็น Object ที่เราเรียกใช้งานง่ายๆ เช่น parsed.subject หรือ parsed.text

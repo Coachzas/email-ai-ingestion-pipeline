@@ -1,8 +1,9 @@
 const express = require('express');
 const cors = require('cors');
-const ingestRoutes = require('./routes/ingest.routes');
-
 const app = express();
+
+const ingestRoutes = require('./routes/ingest.routes');
+const ocrRoutes = require('./routes/ocr.routes');
 
 // middleware
 app.use(cors());
@@ -15,5 +16,7 @@ app.get('/', (req, res) => {
 
 // IMAP routes
 app.use('/api/ingest', ingestRoutes);
+// OCR routes
+app.use('/api/ocr', ocrRoutes);
 
 module.exports = app;

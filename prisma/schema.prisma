@@ -27,6 +27,8 @@ model Attachment {
   fileType String
   filePath String
 
+  extractedText String?
+
   createdAt DateTime @default(now())
 
   email Email @relation(fields: [emailId], references: [id])
