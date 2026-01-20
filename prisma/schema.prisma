@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Email {
+  id        String   @id @default(uuid())
+  imapUid  Int      @unique
+
+  fromEmail String
+  subject   String?
+  bodyText  String?
+  receivedAt DateTime
+  createdAt DateTime @default(now())
+
+  attachments Attachment[]
+}
+
+model Attachment {
+  id        String   @id @default(uuid())
+  emailId  String
+
+  fileName String
+  fileType String
+  filePath String
+
+  createdAt DateTime @default(now())
+
+  email Email @relation(fields: [emailId], references: [id])
+}
