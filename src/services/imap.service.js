@@ -5,7 +5,7 @@ const path = require('path');
 const prisma = require('../utils/prisma');
 
 //ฟังก์ชันสำหรับเชื่อมต่อและดึงข้อมูลอีเมล ผ่านไลบรารีที่ชื่อว่า Imapflow
-async function fetchEmails(startDate, endDate) {
+async function fetchEmails(startDate, endDate, previewMode = false) {
     const client = new ImapFlow({ // configure การเชื่อมต่อ ดึงค่ามาจากไฟล์ .env
         host: process.env.IMAP_HOST,
         port: process.env.IMAP_PORT,
@@ -35,10 +35,60 @@ async function fetchEmails(startDate, endDate) {
 
         // ดึง UID ของอีเมลตามเงื่อนไข
         const uids = await client.search(searchQuery);
-        const lastUids = uids.slice(-50); // limit to last 50 matching
+        const lastUids = uids.slice(-100); // limit to last 100 matching
         console.log(`📧 Found ${lastUids.length} matching emails`);
 
-        // ดึงอีเมลทีละฉบับตาม UID ที่ได้มา
+        // ถ้าเป็น preview mode ให้คืนค่าอีเมลโดยไม่บันทึก
+        if (previewMode) {
+            const previewEmails = [];
+            
+            for (const uid of lastUids) {
+                try {
+                    console.log(`🔍 Previewing UID: ${uid}...`);
+                    
+                    // ใช้ ImapFlow ดึง attachment content โดยตรง
+                    const msg = await client.fetchOne(uid, { 
+                        source: true,
+                        bodyStructure: true,
+                        envelope: true
+                    });
+                    const parsed = await simpleParser(msg.source);
+
+                    // Debug attachments content
+                    if (parsed.attachments && parsed.attachments.length > 0) {
+                        console.log(`📎 UID ${uid} has ${parsed.attachments.length} attachments:`);
+                        parsed.attachments.forEach((att, index) => {
+                            console.log(`  ${index + 1}. ${att.filename}: content=${att.content ? att.content.length : 'null'} bytes, contentType=${att.contentType}, size=${att.size}`);
+                        });
+                    }
+
+                    previewEmails.push({
+                        imapUid: uid,
+                        from: parsed.from?.text || 'Unknown',
+                        subject: parsed.subject || 'No Subject',
+                        date: parsed.date || new Date(),
+                        text: parsed.text,
+                        html: parsed.html,
+                        attachments: parsed.attachments?.map(att => ({
+                            filename: att.filename,
+                            contentType: att.contentType,
+                            size: att.size,
+                            content: att.content, // เก็บ content จริง
+                            path: att.path
+                        })) || []
+                    });
+                    const attachmentCount = parsed.attachments?.length || 0;
+                    const totalContentSize = parsed.attachments?.reduce((sum, att) => sum + (att.content?.length || 0), 0) || 0;
+                    console.log(`📧 Previewed: ${parsed.subject || 'No Subject'} (${parsed.from?.text || 'Unknown'}) - ${attachmentCount} attachments (${totalContentSize} bytes)`);
+                } catch (msgErr) {
+                    console.error(`❌ Failed to preview UID ${uid}:`, msgErr.message);
+                }
+            }
+            
+            return previewEmails;
+        }
+
+        // ดึงอีเมลทีละฉบับตาม UID ที่ได้มา (normal mode)
         for (const uid of lastUids) {
             try {
                 console.log(`⏳ Processing UID: ${uid}...`);

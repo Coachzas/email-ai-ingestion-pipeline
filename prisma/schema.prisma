@@ -21,11 +21,12 @@ model Email {
 
 model Attachment {
   id        String   @id @default(uuid())
-  emailId  String
+  emailId   String
 
   fileName String
   fileType String
   filePath String
+  size     Int?
 
   extractedText String?
 

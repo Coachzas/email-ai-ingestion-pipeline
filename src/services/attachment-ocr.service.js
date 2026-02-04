@@ -2,9 +2,6 @@ const extractors = require('./extractors');
 const { runOCR } = require('./ocr/ocr.service');
 const prisma = require('../utils/prisma');
 
-// Threshold for PDF text detection (if < 100 chars, attempt to OCR scanned pages)
-const PDF_TEXT_THRESHOLD = 100;
-
 /**
  * Extract text from file based on type
  */
@@ -58,7 +55,7 @@ async function extractText(file) {
  * Process attachments that don't have extractedText yet
  * Only logs errors and final summary
  */
-async function processAttachmentsOCR(limit = 10) {
+async function processAttachmentsOCR(limit = 30) {
   const attachments = await prisma.attachment.findMany({
     where: {
       OR: [
@@ -73,10 +70,37 @@ async function processAttachmentsOCR(limit = 10) {
 
   let processed = 0;
   let errors = 0;
+  let skipped = 0;
   const results = [];
 
   for (const att of attachments) {
     try {
+      // ตรวจสอบว่าไฟล์มีอยู่จริงหรือไม่
+      const fs = require('fs');
+      if (!fs.existsSync(att.filePath)) {
+        console.error(`❌ File not found: ${att.fileName} (${att.filePath})`);
+        results.push({
+          fileName: att.fileName,
+          error: 'File not found on disk',
+          status: 'missing'
+        });
+        errors++;
+        continue;
+      }
+
+      // ตรวจสอบขนาดไฟล์ ถ้าเป็น empty file ให้ข้าม
+      const stats = fs.statSync(att.filePath);
+      if (stats.size === 0) {
+        console.log(`⚠️  Skipping empty file: ${att.fileName}`);
+        results.push({
+          fileName: att.fileName,
+          status: 'skipped',
+          reason: 'Empty file'
+        });
+        skipped++;
+        continue;
+      }
+
       const file = { 
         filePath: att.filePath, 
         fileType: att.fileType, 
@@ -103,17 +127,27 @@ async function processAttachmentsOCR(limit = 10) {
         data: { extractedText: text || '' },
       });
 
+      const hasText = text && text.trim().length > 0;
       results.push({
         fileName: att.fileName,
         fileType: att.fileType,
-        extracted: text && text.trim().length > 0
+        extracted: hasText,
+        textLength: text ? text.length : 0,
+        status: hasText ? 'success' : 'no_text'
       });
-      processed++;
+      
+      if (hasText) {
+        processed++;
+      } else {
+        skipped++;
+        console.log(`⚠️  ${att.fileName}: No text extracted`);
+      }
     } catch (err) {
       console.error(`❌ ${att.fileName}: ${err.message}`);
       results.push({ 
         fileName: att.fileName, 
-        error: err.message 
+        error: err.message,
+        status: 'error'
       });
       errors++;
     }
@@ -123,11 +157,13 @@ async function processAttachmentsOCR(limit = 10) {
     total: attachments.length,
     processed,
     errors,
-    successful: processed - errors
+    skipped,
+    successful: processed,
+    results
   };
 
-  console.log(`\n✅ Summary: Processed ${processed}/${attachments.length} (${errors} errors)\n`);
-  return { ...summary, results };
+  console.log(`\n✅ Summary: Processed ${processed}/${attachments.length} (${errors} errors, ${skipped} no text)\n`);
+  return { ...summary };
 }
 
-module.exports = { extractText, processAttachmentsOCR };
+module.exports = { processAttachmentsOCR };

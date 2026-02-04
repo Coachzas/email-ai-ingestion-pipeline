@@ -12,3 +12,8 @@ storage
 
 # logs
 npm-debug.log*
+
+# tesseract cache and duplicate files
+.tesseract-cache
+*.traineddata
+!tessdata/*.traineddata

@@ -4,6 +4,7 @@ const app = express();
 
 const ingestRoutes = require('./routes/ingest.routes');
 const ocrRoutes = require('./routes/ocr.routes');
+const emailRoutes = require('./routes/email.routes');
 
 const path = require('path');
 
@@ -18,6 +19,8 @@ app.use(express.json({ limit: '20mb' }));
 app.use('/api/ingest', ingestRoutes);
 // OCR routes
 app.use('/api/ocr', ocrRoutes);
+// Email routes
+app.use('/api/ingest', emailRoutes);
 
 // default page
 app.get('/', (req, res) => {

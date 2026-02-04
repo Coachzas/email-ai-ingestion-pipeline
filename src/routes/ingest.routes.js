@@ -3,7 +3,10 @@ const express = require('express');
 const router = express.Router();
 
 // นำเข้าฟังก์ชัน runFetch จากไฟล์ควบคุม ingest.controller.js
-const { runFetch } = require('../controllers/ingest.controller');
+const { runFetch, getEmailSummary, fetchEmailsPreview, saveSelectedEmails } = require('../controllers/ingest.controller');
 router.post('/fetch-email', runFetch); //Path /fetch-email: เมื่อมีคนเรียกมาที่ domain ของ fetch-email โค้ดจะส่งงานต่อไปให้ฟังก์ชัน runFetch
+router.get('/email-summary', getEmailSummary); //Path /email-summary: ดูสรุปข้อมูลอีเมล
+router.post('/fetch-emails-preview', fetchEmailsPreview); //Path /fetch-emails-preview: ดึงอีเมลมาดูก่อน (ไม่บันทึก)
+router.post('/save-selected-emails', saveSelectedEmails); //Path /save-selected-emails: บันทึกอีเมลที่เลือก
 
 module.exports = router;

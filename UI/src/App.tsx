@@ -1,12 +1,16 @@
-import React, { useMemo, lazy, Suspense } from 'react'
-import ErrorBoundary from './components/ErrorBoundary'
-import LoadingSpinner from './components/LoadingSpinner'
+import React, { useMemo, useEffect, lazy, Suspense, useState } from 'react'
+import ErrorBoundary from './components/ErrorBoundary.tsx'
+import LoadingSpinner from './components/LoadingSpinner.tsx'
+import SearchableLog from './components/SearchableLog.tsx'
+import EmailSelection from './components/EmailSelection.tsx'
 import { useEmailPipeline } from './hooks/useEmailPipeline'
 
-// Lazy load the EmailDetails component for better bundle splitting
-const EmailDetails = lazy(() => import('./components/EmailDetails'))
+// Lazy load components
+const EmailDetails = lazy(() => import('./components/EmailDetails.tsx'))
+const EmailHistory = lazy(() => import('./components/EmailHistory.tsx'))
 
 export default function App() {
+  const [showHistory, setShowHistory] = useState(false)
   const {
     startDate,
     endDate,
@@ -15,12 +19,20 @@ export default function App() {
     error,
     lastFetchedEmails,
     showEmailDetails,
+    searchTerm,
+    emailSummary,
+    previewEmails,
+    showEmailSelection,
     setStartDate,
     setEndDate,
-    fetchEmails,
+    fetchEmailsPreview,
+    saveSelectedEmails,
     clearError,
     showEmailDetailsModal,
-    hideEmailDetailsModal
+    hideEmailDetailsModal,
+    hideEmailSelectionModal,
+    setSearchTerm,
+    fetchEmailSummary
   } = useEmailPipeline()
 
   const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -33,7 +45,12 @@ export default function App() {
 
   const isFormValid = useMemo(() => {
     return Boolean(startDate || endDate)
-  }, [startDate, endDate])
+  }, [startDate, endDate, isLoading])
+
+  // ดึงข้อมูลสรุปเมื่อ component mount
+  useEffect(() => {
+    fetchEmailSummary()
+  }, [])
 
   const buttonText = useMemo(() => {
     return isLoading ? '⏳ กำลังดำเนินการ...' : '📥 ดึงอีเมล'
@@ -45,6 +62,14 @@ export default function App() {
         <header>
           <h1>📧 Email AI Pipeline</h1>
           <p>เลือกช่วงวันที่เพื่อดึงอีเมลจาก IMAP</p>
+          <div className="header-buttons">
+            <button 
+              onClick={() => setShowHistory(!showHistory)}
+              className="history-button"
+            >
+              {showHistory ? '📥 ดึงอีเมล' : '📋 ประวัติอีเมล'}
+            </button>
+          </div>
         </header>
 
         {error && (
@@ -54,7 +79,7 @@ export default function App() {
             aria-live="polite"
             id="error-message"
           >
-            <span>❌ {error}</span>
+            <span>❌ {error.message}</span>
             <button 
               onClick={clearError} 
               className="close-error"
@@ -65,7 +90,13 @@ export default function App() {
           </div>
         )}
 
-        <form className="controls" onSubmit={(e) => { e.preventDefault(); fetchEmails(); }}>
+        {showHistory ? (
+          <Suspense fallback={<LoadingSpinner />}>
+            <EmailHistory />
+          </Suspense>
+        ) : (
+          <>
+            <form className="controls" onSubmit={(e) => { e.preventDefault(); fetchEmailsPreview(); }}>
           <label>
             เริ่มต้น
             <input 
@@ -76,9 +107,6 @@ export default function App() {
               aria-label="วันที่เริ่มต้น"
               aria-describedby="start-date-description"
             />
-            <span id="start-date-description" className="sr-only">
-              เลือกวันที่เริ่มต้นสำหรับดึงอีเมล
-            </span>
           </label>
           <label>
             สิ้นสุด
@@ -90,15 +118,11 @@ export default function App() {
               aria-label="วันที่สิ้นสุด"
               aria-describedby="end-date-description"
             />
-            <span id="end-date-description" className="sr-only">
-              เลือกวันที่สิ้นสุดสำหรับดึงอีเมล
-            </span>
           </label>
           <button 
-            type="submit"
-            disabled={!isFormValid || isLoading}
-            aria-busy={isLoading}
-            aria-describedby={error ? 'error-message' : undefined}
+            type="submit" 
+            disabled={isLoading || !isFormValid}
+            aria-describedby="submit-description"
           >
             {isLoading && <LoadingSpinner size="small" />}
             {buttonText}
@@ -119,15 +143,11 @@ export default function App() {
         <main>
           <div className="log-container">
             <h2 className="sr-only">ผลลัพธ์การดำเนินการ</h2>
-            <pre 
-              id="log" 
-              role="log" 
-              aria-live="polite"
-              aria-label="บันทึกการดำเนินการ"
-              tabIndex={0}
-            >
-              {log}
-            </pre>
+            <SearchableLog 
+              content={log}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+            />
           </div>
         </main>
 
@@ -135,9 +155,23 @@ export default function App() {
           <Suspense fallback={<div className="modal-loading"><LoadingSpinner message="กำลังโหลดรายละเอียด..." /></div>}>
             <EmailDetails 
               emails={lastFetchedEmails} 
+              emailSummary={emailSummary}
               onClose={hideEmailDetailsModal} 
             />
           </Suspense>
+        )}
+
+        {showEmailSelection && previewEmails && (
+          <Suspense fallback={<div className="modal-loading"><LoadingSpinner message="กำลังโหลด..." /></div>}>
+            <EmailSelection 
+              emails={previewEmails}
+              isLoading={isLoading}
+              onClose={hideEmailSelectionModal}
+              onSaveSelected={saveSelectedEmails}
+            />
+          </Suspense>
+        )}
+          </>
         )}
       </div>
     </ErrorBoundary>
