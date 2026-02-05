@@ -58,7 +58,7 @@ async function fetchEmails(startDate, endDate, previewMode = false) {
                     if (parsed.attachments && parsed.attachments.length > 0) {
                         console.log(`📎 UID ${uid} has ${parsed.attachments.length} attachments:`);
                         parsed.attachments.forEach((att, index) => {
-                            console.log(`  ${index + 1}. ${att.filename}: content=${att.content ? att.content.length : 'null'} bytes, contentType=${att.contentType}, size=${att.size}`);
+                            console.log(`  ${index + 1}. ${att.filename} - Content length: ${att.content ? att.content.length : 0} bytes`);
                         });
                     }
 
@@ -173,4 +173,35 @@ async function fetchEmails(startDate, endDate, previewMode = false) {
     }
 }
 
-module.exports = { fetchEmails }; // ส่งออกฟังก์ชัน fetchEmails เพื่อให้ไฟล์อื่นๆ สามารถเรียกใช้งานได้
+async function fetchEmailByUid(uid) {
+    const client = new ImapFlow({
+        host: process.env.IMAP_HOST,
+        port: process.env.IMAP_PORT,
+        secure: true,
+        auth: {
+            user: process.env.IMAP_USER,
+            pass: process.env.IMAP_PASS,
+        },
+    });
+
+    try {
+        await client.connect();
+        await client.mailboxOpen('INBOX');
+
+        const msg = await client.fetchOne(uid, {
+            source: true,
+            bodyStructure: true,
+            envelope: true
+        });
+
+        const parsed = await simpleParser(msg.source);
+        return parsed;
+    } finally {
+        try {
+            await client.logout();
+        } catch (e) {
+        }
+    }
+}
+
+module.exports = { fetchEmails, fetchEmailByUid }; // ส่งออกฟังก์ชัน fetchEmails เพื่อให้ไฟล์อื่นๆ สามารถเรียกใช้งานได้

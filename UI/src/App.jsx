@@ -1,16 +1,18 @@
 import React, { useMemo, useEffect, lazy, Suspense, useState } from 'react'
-import ErrorBoundary from './components/ErrorBoundary.tsx'
-import LoadingSpinner from './components/LoadingSpinner.tsx'
-import SearchableLog from './components/SearchableLog.tsx'
-import EmailSelection from './components/EmailSelection.tsx'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
+import LoadingSpinner from './components/LoadingSpinner.jsx'
+import SearchableLog from './components/SearchableLog.jsx'
+import EmailSelection from './components/EmailSelection.jsx'
+import ReviewQueue from './components/ReviewQueue.jsx'
+import ReviewEmailModal from './components/ReviewEmailModal.jsx'
 import { useEmailPipeline } from './hooks/useEmailPipeline'
 
 // Lazy load components
-const EmailDetails = lazy(() => import('./components/EmailDetails.tsx'))
-const EmailHistory = lazy(() => import('./components/EmailHistory.tsx'))
+const EmailDetails = lazy(() => import('./components/EmailDetails.jsx'))
 
 export default function App() {
-  const [showHistory, setShowHistory] = useState(false)
+  const [reviewEmailId, setReviewEmailId] = useState(null)
+
   const {
     startDate,
     endDate,
@@ -35,11 +37,11 @@ export default function App() {
     fetchEmailSummary
   } = useEmailPipeline()
 
-  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleStartDateChange = (e) => {
     setStartDate(e.target.value)
   }
 
-  const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleEndDateChange = (e) => {
     setEndDate(e.target.value)
   }
 
@@ -56,20 +58,20 @@ export default function App() {
     return isLoading ? '⏳ กำลังดำเนินการ...' : '📥 ดึงอีเมล'
   }, [isLoading])
 
+  const openReviewEmail = (id) => {
+    setReviewEmailId(id)
+  }
+
+  const closeReviewEmail = () => {
+    setReviewEmailId(null)
+  }
+
   return (
     <ErrorBoundary>
       <div className="container">
         <header>
           <h1>📧 Email AI Pipeline</h1>
           <p>เลือกช่วงวันที่เพื่อดึงอีเมลจาก IMAP</p>
-          <div className="header-buttons">
-            <button 
-              onClick={() => setShowHistory(!showHistory)}
-              className="history-button"
-            >
-              {showHistory ? '📥 ดึงอีเมล' : '📋 ประวัติอีเมล'}
-            </button>
-          </div>
         </header>
 
         {error && (
@@ -90,13 +92,7 @@ export default function App() {
           </div>
         )}
 
-        {showHistory ? (
-          <Suspense fallback={<LoadingSpinner />}>
-            <EmailHistory />
-          </Suspense>
-        ) : (
-          <>
-            <form className="controls" onSubmit={(e) => { e.preventDefault(); fetchEmailsPreview(); }}>
+        <form className="controls" onSubmit={(e) => { e.preventDefault(); fetchEmailsPreview(); }}>
           <label>
             เริ่มต้น
             <input 
@@ -121,42 +117,28 @@ export default function App() {
           </label>
           <button 
             type="submit" 
-            disabled={isLoading || !isFormValid}
+            disabled={!isFormValid || isLoading}
             aria-describedby="submit-description"
           >
-            {isLoading && <LoadingSpinner size="small" />}
             {buttonText}
           </button>
-          {lastFetchedEmails && lastFetchedEmails.length > 0 && (
-            <button 
-              onClick={showEmailDetailsModal}
-              disabled={isLoading}
-              className="secondary-button"
-              type="button"
-              aria-label={`ดูรายละเอียดอีเมล ${lastFetchedEmails.length} ฉบับ`}
-            >
-              📋 ดูรายละเอียดอีเมล ({lastFetchedEmails.length})
-            </button>
-          )}
         </form>
 
-        <main>
-          <div className="log-container">
-            <h2 className="sr-only">ผลลัพธ์การดำเนินการ</h2>
-            <SearchableLog 
-              content={log}
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-            />
-          </div>
-        </main>
+        <div id="log" role="log" aria-live="polite">
+          <SearchableLog 
+            log={log} 
+            searchTerm={searchTerm} 
+            onSearchChange={setSearchTerm} 
+          />
+        </div>
+
+        <ReviewQueue onOpenEmail={openReviewEmail} />
 
         {showEmailDetails && lastFetchedEmails && (
-          <Suspense fallback={<div className="modal-loading"><LoadingSpinner message="กำลังโหลดรายละเอียด..." /></div>}>
+          <Suspense fallback={<div className="modal-loading"><LoadingSpinner message="กำลังโหลด..." /></div>}>
             <EmailDetails 
-              emails={lastFetchedEmails} 
-              emailSummary={emailSummary}
-              onClose={hideEmailDetailsModal} 
+              emails={lastFetchedEmails.emails}
+              onClose={hideEmailDetailsModal}
             />
           </Suspense>
         )}
@@ -171,7 +153,9 @@ export default function App() {
             />
           </Suspense>
         )}
-          </>
+
+        {reviewEmailId && (
+          <ReviewEmailModal emailId={reviewEmailId} onClose={closeReviewEmail} />
         )}
       </div>
     </ErrorBoundary>

@@ -1,0 +1,176 @@
+import { useState, useCallback } from 'react'
+
+export const useEmailPipeline = () => {
+  const [state, setState] = useState({
+    startDate: '',
+    endDate: '',
+    log: 'รอคำสั่ง...',
+    isLoading: false,
+    error: null,
+    lastFetchedEmails: null,
+    showEmailDetails: false,
+    searchTerm: '',
+    emailSummary: null,
+    previewEmails: null,
+    showEmailSelection: false
+  })
+
+  const setStartDate = useCallback((date) => {
+    setState(prev => ({ ...prev, startDate: date }))
+  }, [])
+
+  const setEndDate = useCallback((date) => {
+    setState(prev => ({ ...prev, endDate: date }))
+  }, [])
+
+  const clearError = useCallback(() => {
+    setState(prev => ({ ...prev, error: null }))
+  }, [])
+
+  const showEmailDetailsModal = useCallback(() => {
+    setState(prev => ({ ...prev, showEmailDetails: true }))
+  }, [])
+
+  const hideEmailDetailsModal = useCallback(() => {
+    setState(prev => ({ ...prev, showEmailDetails: false }))
+  }, [])
+
+  const hideEmailSelectionModal = useCallback(() => {
+    setState(prev => ({ ...prev, showEmailSelection: false, previewEmails: null }))
+  }, [])
+
+  const resetState = useCallback(() => {
+    setState({
+      startDate: '',
+      endDate: '',
+      log: 'รอคำสั่ง...',
+      isLoading: false,
+      error: null,
+      lastFetchedEmails: null,
+      showEmailDetails: false,
+      searchTerm: '',
+      emailSummary: null,
+      previewEmails: null,
+      showEmailSelection: false
+    })
+  }, [])
+
+  const setSearchTerm = useCallback((term) => {
+    setState(prev => ({ ...prev, searchTerm: term }))
+  }, [])
+
+  const setEmailSummary = useCallback((summary) => {
+    setState(prev => ({ ...prev, emailSummary: summary }))
+  }, [])
+
+  const fetchEmailSummary = useCallback(async () => {
+    try {
+      const response = await fetch('/api/ocr/summary')
+      if (!response.ok) throw new Error('Failed to fetch email summary')
+      
+      const data = await response.json()
+      setEmailSummary(data.summary)
+    } catch (err) {
+      console.error('Error fetching email summary:', err)
+    }
+  }, [])
+
+  const fetchEmailsPreview = useCallback(async () => {
+    setState(prev => ({ ...prev, isLoading: true, error: null, log: 'กำลังเชื่อมต่อ IMAP...\n' }))
+    
+    try {
+      const response = await fetch('/api/ingest/fetch-emails-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startDate: state.startDate || undefined,
+          endDate: state.endDate || undefined
+        })
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || 'Failed to fetch emails')
+      }
+      
+      const data = await response.json()
+      
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        lastFetchedEmails: data,
+        previewEmails: data.emails,
+        showEmailSelection: true,
+        log: `✅ พบอีเมล ${data.emails.length} ฉบับ\n` +
+            `📎 มีไฟล์แนบ ${data.withAttachments} ฉบับ\n` +
+            `📋 กรุณาเลือกอีเมลที่ต้องการบันทึก\n`
+      }))
+    } catch (err) {
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: { message: err.message, code: 'FETCH_ERROR' },
+        log: `❌ เกิดข้อผิดพลาด: ${err.message}\n`
+      }))
+    }
+  }, [state.startDate, state.endDate])
+
+  const saveSelectedEmails = useCallback(async (selectedEmails) => {
+    setState(prev => ({ ...prev, isLoading: true, log: 'กำลังบันทึกอีเมลที่เลือก...\n' }))
+    
+    try {
+      // Debug: ตรวจสอบข้อมูลที่ส่ง
+      console.log('🔍 Selected emails to save:', selectedEmails);
+      
+      const response = await fetch('/api/ingest/save-selected-emails', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selectedEmails })
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || 'Failed to save emails')
+      }
+      
+      const data = await response.json()
+      
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        showEmailSelection: false,
+        previewEmails: null,
+        log: `${prev.log}${data.message}\n` +
+            `✅ บันทึกอีเมล ${data.savedCount || 0} ฉบับเสร็จแล้ว\n` +
+            `⏭️ ข้าม ${data.skippedCount || 0} ฉบับที่ซ้ำ/ผิดพลาด\n` +
+            `📎 บันทึกไฟล์แนบ ${data.attachmentSavedCount || 0} ไฟล์ (ข้าม ${data.attachmentSkippedCount || 0} ไฟล์)\n`
+      }))
+      
+      // ดึงข้อมูลสรุปใหม่
+      await fetchEmailSummary()
+    } catch (err) {
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: { message: err.message, code: 'SAVE_ERROR' },
+        log: `${prev.log}❌ เกิดข้อผิดพลาด: ${err.message}\n`
+      }))
+    }
+  }, [fetchEmailSummary])
+
+  return {
+    ...state,
+    setStartDate,
+    setEndDate,
+    fetchEmailsPreview,
+    saveSelectedEmails,
+    clearError,
+    showEmailDetailsModal,
+    hideEmailDetailsModal,
+    hideEmailSelectionModal,
+    resetState,
+    setSearchTerm,
+    setEmailSummary,
+    fetchEmailSummary
+  }
+}

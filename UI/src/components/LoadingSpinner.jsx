@@ -1,11 +1,6 @@
 import React from 'react'
 
-interface LoadingSpinnerProps {
-  size?: 'small' | 'medium' | 'large'
-  message?: string
-}
-
-const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ 
+const LoadingSpinner = ({ 
   size = 'medium', 
   message = 'กำลังโหลด...' 
 }) => {
@@ -15,7 +10,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
     large: { width: '32px', height: '32px' }
   }
 
-  const spinnerStyle: React.CSSProperties = {
+  const spinnerStyle = {
     display: 'inline-block',
     border: '2px solid #f3f3f3',
     borderTop: '2px solid #007bff',
