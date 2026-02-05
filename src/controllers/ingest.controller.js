@@ -4,6 +4,14 @@ const { processAttachmentsOCR } = require('../services/attachment-ocr.service');
 
 const prisma = require('../utils/prisma');
 
+const { 
+  startEmailProgress, 
+  completeEmailProgress, 
+  updateCurrentEmail, 
+  incrementProcessed, 
+  incrementErrors 
+} = require('./email-progress.controller');
+
 
 
 async function runFetch(req, res) {
@@ -215,7 +223,8 @@ async function saveSelectedEmails(req, res) {
 
         console.log(`💾 Processing ${emailsToProcess.length} emails...`);
 
-
+        // Start progress tracking
+        await startEmailProgress(emailsToProcess.length);
 
         const savedEmails = [];
         const skippedEmails = [];
@@ -235,6 +244,9 @@ async function saveSelectedEmails(req, res) {
 
             console.log(`\n🔍 Processing email: ${emailData.subject} (${emailData.imapUid})`);
 
+            // Update progress with current email
+            updateCurrentEmail(emailData.subject || `UID ${emailData.imapUid}`);
+
             console.log('📋 Email data:', JSON.stringify(emailData, null, 2));
 
             try {
@@ -245,6 +257,7 @@ async function saveSelectedEmails(req, res) {
                         imapUid: emailData.imapUid,
                         reason: 'invalid imapUid'
                     });
+                    incrementErrors();
                     continue;
                 }
 
@@ -338,6 +351,9 @@ async function saveSelectedEmails(req, res) {
 
                 console.log(`✅ Saved email UID: ${uid} (attachments saved: ${attachmentsSavedForThisEmail}, skipped: ${attachmentsSkippedForThisEmail})`);
 
+                // Increment processed count
+                incrementProcessed();
+
                 
 
             } catch (emailErr) {
@@ -352,11 +368,14 @@ async function saveSelectedEmails(req, res) {
 
                 });
 
+                incrementErrors();
+
             }
 
         }
 
-
+        // Complete progress tracking
+        completeEmailProgress();
 
         let ocrResult = { processed: 0, total: 0 };
 
@@ -423,6 +442,9 @@ async function saveSelectedEmails(req, res) {
     } catch (err) {
 
         console.error('SAVE ERROR:', err);
+
+        // Complete progress with error
+        completeEmailProgress();
 
         res.status(500).json({
 

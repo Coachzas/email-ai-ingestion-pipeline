@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 
 export const useEmailPipeline = () => {
   const [state, setState] = useState({
@@ -12,8 +12,58 @@ export const useEmailPipeline = () => {
     searchTerm: '',
     emailSummary: null,
     previewEmails: null,
-    showEmailSelection: false
+    showEmailSelection: false,
+    // Email saving progress state
+    emailProgress: {
+      isProcessing: false,
+      progress: 0,
+      currentEmail: '',
+      totalEmails: 0,
+      processed: 0,
+      errors: 0
+    }
   })
+
+  // SSE connection for email progress
+  useEffect(() => {
+    let eventSource
+
+    const connectEmailProgress = () => {
+      eventSource = new EventSource('/api/email-progress/progress')
+      
+      eventSource.onmessage = (event) => {
+        try {
+          const progressData = JSON.parse(event.data)
+          setState(prev => ({
+            ...prev,
+            emailProgress: {
+              ...prev.emailProgress,
+              ...progressData,
+              // Calculate progress percentage
+              progress: progressData.totalEmails > 0 
+                ? Math.round((progressData.processed / progressData.totalEmails) * 100)
+                : 0
+            }
+          }))
+        } catch (err) {
+          console.error('Error parsing email progress data:', err)
+        }
+      }
+
+      eventSource.onerror = (err) => {
+        console.error('Email progress SSE error:', err)
+        eventSource?.close()
+        // Reconnect after 3 seconds
+        setTimeout(connectEmailProgress, 3000)
+      }
+    }
+
+    connectEmailProgress()
+
+    return () => {
+      eventSource?.close()
+    }
+  }, [])
 
   const setStartDate = useCallback((date) => {
     setState(prev => ({ ...prev, startDate: date }))
@@ -51,7 +101,16 @@ export const useEmailPipeline = () => {
       searchTerm: '',
       emailSummary: null,
       previewEmails: null,
-      showEmailSelection: false
+      showEmailSelection: false,
+      // Email saving progress state
+      emailProgress: {
+        isProcessing: false,
+        progress: 0,
+        currentEmail: '',
+        totalEmails: 0,
+        processed: 0,
+        errors: 0
+      }
     })
   }, [])
 

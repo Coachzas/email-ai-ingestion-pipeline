@@ -5,6 +5,7 @@ import SearchableLog from './components/SearchableLog.jsx'
 import EmailSelection from './components/EmailSelection.jsx'
 import ReviewQueue from './components/ReviewQueue.jsx'
 import ReviewEmailModal from './components/ReviewEmailModal.jsx'
+import EmailProgressIndicator from './components/EmailProgressIndicator.jsx'
 import { useEmailPipeline } from './hooks/useEmailPipeline'
 
 // Lazy load components
@@ -25,6 +26,7 @@ export default function App() {
     emailSummary,
     previewEmails,
     showEmailSelection,
+    emailProgress,
     setStartDate,
     setEndDate,
     fetchEmailsPreview,
@@ -157,6 +159,15 @@ export default function App() {
         {reviewEmailId && (
           <ReviewEmailModal emailId={reviewEmailId} onClose={closeReviewEmail} />
         )}
+
+        <EmailProgressIndicator 
+          isProcessing={emailProgress.isProcessing}
+          progress={emailProgress.progress}
+          currentEmail={emailProgress.currentEmail}
+          totalEmails={emailProgress.totalEmails}
+          processed={emailProgress.processed}
+          errors={emailProgress.errors}
+        />
       </div>
     </ErrorBoundary>
   )

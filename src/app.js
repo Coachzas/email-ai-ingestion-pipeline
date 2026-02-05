@@ -5,6 +5,8 @@ const app = express();
 const ingestRoutes = require('./routes/ingest.routes');
 const ocrRoutes = require('./routes/ocr.routes');
 const reviewRoutes = require('./routes/review.routes');
+const ocrProgressRoutes = require('./routes/ocr-progress.routes');
+const emailProgressRoutes = require('./routes/email-progress.routes');
 
 const path = require('path');
 
@@ -21,6 +23,10 @@ app.use('/api/ingest', ingestRoutes);
 app.use('/api/ocr', ocrRoutes);
 // Review routes
 app.use('/api/review', reviewRoutes);
+// OCR Progress routes
+app.use('/api/ocr-progress', ocrProgressRoutes);
+// Email Progress routes
+app.use('/api/email-progress', emailProgressRoutes);
 
 // default page
 app.get('/', (req, res) => {

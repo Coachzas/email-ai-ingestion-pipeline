@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import OcrProgressIndicator from './OcrProgressIndicator.jsx'
+import { useOcrProgress } from '../hooks/useOcrProgress.js'
 
 const formatDate = (dateString) => {
   try {
@@ -18,6 +20,10 @@ export default function ReviewQueue({ onOpenEmail }) {
   const [items, setItems] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [ocrResult, setOcrResult] = useState(null)
+  
+  // Use real-time OCR progress
+  const { progress, isConnected, startOcr } = useOcrProgress()
 
   const [q, setQ] = useState('')
   const [hasAttachments, setHasAttachments] = useState('')
@@ -52,6 +58,35 @@ export default function ReviewQueue({ onOpenEmail }) {
     }
   }, [queryString])
 
+  const handleOcrProcess = async () => {
+    setOcrResult(null)
+    setError(null)
+
+    try {
+      const result = await startOcr()
+      console.log('✅ OCR started:', result)
+      
+      // Auto-refresh when OCR completes
+      const checkInterval = setInterval(() => {
+        if (!progress.isProcessing) {
+          clearInterval(checkInterval)
+          fetchItems()
+          
+          // Set final result
+          setOcrResult({
+            total: progress.totalFiles,
+            processed: progress.processed,
+            errors: progress.errors,
+            skipped: progress.totalFiles - progress.processed - progress.errors
+          })
+        }
+      }, 2000)
+      
+    } catch (err) {
+      setError(err)
+    }
+  }
+
   useEffect(() => {
     fetchItems()
   }, [fetchItems])
@@ -68,15 +103,37 @@ export default function ReviewQueue({ onOpenEmail }) {
   };
 
   return (
-    <section className="review-section">
+    <>
+      <OcrProgressIndicator
+        isProcessing={progress.isProcessing}
+        currentFile={progress.currentFile}
+        totalFiles={progress.totalFiles}
+        processed={progress.processed}
+        errors={progress.errors}
+      />
+      
+      <section className="review-section">
       <div className="review-header">
         <div>
           <h2>👥 Review Queue</h2>
           <p>รายการอีเมลที่บันทึกแล้วสำหรับ HR Review</p>
+          {isConnected && (
+            <p className="connection-status">🟢 Real-time updates connected</p>
+          )}
         </div>
-        <button type="button" className="secondary-button" onClick={fetchItems} disabled={isLoading}>
-          🔄 รีเฟรช
-        </button>
+        <div className="review-header-actions">
+          <button 
+            type="button" 
+            className="primary-button" 
+            onClick={handleOcrProcess} 
+            disabled={progress.isProcessing || isLoading}
+          >
+            {progress.isProcessing ? '⏳ กำลังทำ OCR...' : '🔍 ทำ OCR'}
+          </button>
+          <button type="button" className="secondary-button" onClick={fetchItems} disabled={isLoading}>
+            🔄 รีเฟรช
+          </button>
+        </div>
       </div>
 
       <div className="review-filters">
@@ -118,6 +175,18 @@ export default function ReviewQueue({ onOpenEmail }) {
       </div>
 
       {error && <div className="error-message" role="alert">❌ {error.message}</div>}
+
+      {ocrResult && (
+        <div className="ocr-result" role="status">
+          <h4>🔍 ผลการทำ OCR</h4>
+          <div className="ocr-stats">
+            <span>✅ ประมวลผล: {ocrResult.processed || 0}</span>
+            <span>⚠️ ข้าม: {ocrResult.skipped || 0}</span>
+            <span>❌ ข้อผิดพลาด: {ocrResult.errors || 0}</span>
+            <span>📊 ทั้งหมด: {ocrResult.total || 0}</span>
+          </div>
+        </div>
+      )}
 
       <div className="review-table-wrapper">
         <table className="review-table">
@@ -167,6 +236,7 @@ export default function ReviewQueue({ onOpenEmail }) {
           </tbody>
         </table>
       </div>
-    </section>
+      </section>
+    </>
   )
 }
