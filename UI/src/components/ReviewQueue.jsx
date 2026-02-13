@@ -28,6 +28,8 @@ export default function ReviewQueue({ onOpenEmail }) {
   const [q, setQ] = useState('')
   const [hasAttachments, setHasAttachments] = useState('')
   const [ocrStatus, setOcrStatus] = useState('')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams()
@@ -36,9 +38,16 @@ export default function ReviewQueue({ onOpenEmail }) {
     if (q && q.trim().length > 0) params.set('q', q.trim())
     if (hasAttachments !== '') params.set('hasAttachments', hasAttachments)
     if (ocrStatus !== '') params.set('ocrStatus', ocrStatus)
+    if (fromDate) params.set('fromDate', fromDate)
+    if (toDate) {
+      // When toDate is the same as fromDate, we need to include the entire day
+      // Use local timezone (Thailand UTC+7) instead of UTC
+      const adjustedToDate = fromDate === toDate ? `${toDate}T23:59:59.999+07:00` : toDate
+      params.set('toDate', adjustedToDate)
+    }
 
     return params.toString()
-  }, [q, hasAttachments, ocrStatus])
+  }, [q, hasAttachments, ocrStatus, fromDate, toDate])
 
   const fetchItems = useCallback(async () => {
     setIsLoading(true)
@@ -57,6 +66,7 @@ export default function ReviewQueue({ onOpenEmail }) {
       setIsLoading(false)
     }
   }, [queryString])
+
 
   const handleOcrProcess = async () => {
     setOcrResult(null)
@@ -77,7 +87,7 @@ export default function ReviewQueue({ onOpenEmail }) {
             total: progress.totalFiles,
             processed: progress.processed,
             errors: progress.errors,
-            skipped: progress.totalFiles - progress.processed - progress.errors
+            skipped: Math.max(0, progress.totalFiles - progress.processed - progress.errors)
           })
         }
       }, 2000)
@@ -128,7 +138,7 @@ export default function ReviewQueue({ onOpenEmail }) {
             onClick={handleOcrProcess} 
             disabled={progress.isProcessing || isLoading}
           >
-            {progress.isProcessing ? '⏳ กำลังทำ OCR...' : '🔍 ทำ OCR'}
+            {progress.isProcessing ? '⏳ กำลังดึงข้อความ...' : '🔍 ดึงข้อความจากไฟล์'}
           </button>
           <button type="button" className="secondary-button" onClick={fetchItems} disabled={isLoading}>
             🔄 รีเฟรช
@@ -151,6 +161,30 @@ export default function ReviewQueue({ onOpenEmail }) {
 
         <div className="review-filter">
           <label>
+            วันที่เริ่มต้น
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              max={toDate || undefined}
+            />
+          </label>
+        </div>
+
+        <div className="review-filter">
+          <label>
+            วันที่สิ้นสุด
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              min={fromDate || undefined}
+            />
+          </label>
+        </div>
+
+        <div className="review-filter">
+          <label>
             ไฟล์แนบ
             <select value={hasAttachments} onChange={(e) => setHasAttachments(e.target.value)}>
               <option value="">ทั้งหมด</option>
@@ -165,10 +199,10 @@ export default function ReviewQueue({ onOpenEmail }) {
             OCR
             <select value={ocrStatus} onChange={(e) => setOcrStatus(e.target.value)}>
               <option value="">ทั้งหมด</option>
-              <option value="done">done</option>
-              <option value="partial">partial</option>
-              <option value="pending">pending</option>
-              <option value="none">none</option>
+              <option value="done">เสร็จ</option>
+              <option value="partial">บางส่วน</option>
+              <option value="pending">รอดำเนินการ</option>
+              <option value="none">ไม่มี</option>
             </select>
           </label>
         </div>
@@ -178,7 +212,7 @@ export default function ReviewQueue({ onOpenEmail }) {
 
       {ocrResult && (
         <div className="ocr-result" role="status">
-          <h4>🔍 ผลการทำ OCR</h4>
+          <h4>🔍 ผลการดึงข้อความ</h4>
           <div className="ocr-stats">
             <span>✅ ประมวลผล: {ocrResult.processed || 0}</span>
             <span>⚠️ ข้าม: {ocrResult.skipped || 0}</span>
