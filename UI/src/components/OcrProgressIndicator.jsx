@@ -11,18 +11,18 @@ export default function OcrProgressIndicator({
 }) {
   if (!isProcessing) return null
 
-  const progressPercentage = totalFiles > 0 ? (processed / totalFiles) * 100 : 0
+  const progressPercentage = progress || (totalFiles > 0 ? (processed / totalFiles) * 100 : 0)
 
   return (
     <div className="ocr-progress-overlay">
       <div className="ocr-progress-modal">
         <div className="ocr-progress-header">
-          <h3>🔍 กำลังทำ OCR</h3>
+          <h3>🔍 กำลังดึงข้อความจากไฟล์</h3>
           {onCancel && (
             <button 
               className="ocr-cancel-btn" 
               onClick={onCancel}
-              aria-label="ยกเลิกการทำ OCR"
+              aria-label="ยกเลิกการดึงข้อความ"
             >
               ×
             </button>
@@ -63,6 +63,7 @@ export default function OcrProgressIndicator({
             {processed > 0 && totalFiles > processed && (
               <p>⏱️ ประมาณเวลาที่เหลือ: {estimateRemainingTime(processed, totalFiles)}</p>
             )}
+            <p className="ocr-note">📄 รองรับไฟล์ PDF, DOCX, XLSX, PPTX, CSV และรูปภาพ</p>
           </div>
         </div>
       </div>
