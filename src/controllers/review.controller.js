@@ -255,6 +255,98 @@ const fs = require('fs');
 const fsPromises = require('fs').promises;
 const path = require('path');
 
+// Delete all emails and their attachments
+async function deleteAllEmails(req, res) {
+  try {
+    console.log('🗑️ Attempting to delete ALL emails...');
+    
+    // Get all emails with their attachments
+    const emails = await prisma.email.findMany({
+      include: {
+        attachments: true
+      }
+    });
+
+    if (!emails || emails.length === 0) {
+      console.log('📧 No emails found to delete');
+      return res.json({
+        status: 'success',
+        message: 'No emails to delete',
+        deletedCount: 0,
+        deletedAttachments: 0
+      });
+    }
+
+    console.log(`📧 Found ${emails.length} emails to delete`);
+
+    // Track statistics
+    let deletedAttachmentsCount = 0;
+    const foldersToDelete = new Set();
+
+    // Delete all attachment files from file system
+    for (const email of emails) {
+      if (email.attachments && email.attachments.length > 0) {
+        for (const attachment of email.attachments) {
+          try {
+            if (attachment.filePath && fs.existsSync(attachment.filePath)) {
+              await fsPromises.unlink(attachment.filePath);
+              console.log(`📁 Deleted file: ${attachment.fileName}`);
+              deletedAttachmentsCount++;
+              
+              // Track parent folder for cleanup
+              const folderPath = path.dirname(attachment.filePath);
+              if (folderPath && folderPath !== '.') {
+                foldersToDelete.add(folderPath);
+              }
+            }
+          } catch (fileErr) {
+            console.error(`❌ Error deleting file ${attachment.fileName}:`, fileErr.message);
+          }
+        }
+      }
+    }
+
+    // Delete empty folders
+    for (const folderPath of foldersToDelete) {
+      try {
+        const files = await fsPromises.readdir(folderPath);
+        if (files.length === 0) {
+          await fsPromises.rmdir(folderPath);
+          console.log(`🗂️ Deleted folder: ${path.basename(folderPath)}`);
+        }
+      } catch (folderErr) {
+        // Silently ignore folder deletion errors
+      }
+    }
+
+    // Delete all attachments from database
+    const attachmentsResult = await prisma.attachment.deleteMany({});
+    console.log(`🗑️ Deleted ${attachmentsResult.count} attachments from database`);
+
+    // Delete all emails from database
+    const emailsResult = await prisma.email.deleteMany({});
+    console.log(`🗑️ Deleted ${emailsResult.count} emails from database`);
+
+    console.log(`✅ All emails deleted successfully: ${emailsResult.count} emails, ${deletedAttachmentsCount} files`);
+
+    res.json({
+      status: 'success',
+      message: 'All emails deleted successfully',
+      deletedCount: emailsResult.count,
+      deletedAttachments: deletedAttachmentsCount
+    });
+
+  } catch (error) {
+    console.error('❌ Review deleteAllEmails error:', error);
+    console.error('❌ Full error stack:', error.stack);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to delete all emails',
+      error: error.message
+    });
+  }
+}
+
 // Delete email and its attachments
 async function deleteEmail(req, res) {
   try {
@@ -356,5 +448,6 @@ module.exports = {
   listEmails,
   getEmailDetail,
   downloadAttachment,
-  deleteEmail
+  deleteEmail,
+  deleteAllEmails
 };

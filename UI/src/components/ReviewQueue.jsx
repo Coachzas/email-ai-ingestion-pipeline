@@ -110,6 +110,68 @@ export default function ReviewQueue({ onOpenEmail }) {
     }
   }
 
+  const handleDeleteAllEmails = async () => {
+    if (!window.confirm('⚠️ ยืนยันการลบอีเมลทั้งหมด?\n\nการกระทำนี้จะลบ:\n• ข้อมูลอีเมลทั้งหมดในฐานข้อมูล\n• ไฟล์แนบทั้งหมดใน storage\n• ไม่สามารถกู้คืนได้')) {
+      return
+    }
+
+    setError(null)
+    setIsLoading(true)
+
+    try {
+      const response = await fetch('/api/review/emails', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      console.log('🔍 Response status:', response.status)
+      console.log('🔍 Response headers:', response.headers)
+      
+      if (!response.ok) {
+        const responseText = await response.text()
+        console.log('🔍 Response text (error):', responseText)
+        
+        let errorData
+        try {
+          errorData = JSON.parse(responseText)
+        } catch (parseErr) {
+          throw new Error(responseText)
+        }
+        
+        throw new Error(errorData.message || 'Failed to delete all emails')
+      }
+
+      const responseText = await response.text()
+      console.log('🔍 Response text (success):', responseText)
+      
+      let result
+      try {
+        result = JSON.parse(responseText)
+      } catch (parseErr) {
+        console.error('❌ JSON parse error:', parseErr)
+        console.error('❌ Response was:', responseText)
+        throw new Error('Invalid response from server')
+      }
+      
+      console.log('✅ Deleted all emails:', result)
+      
+      // Refresh the list
+      fetchItems()
+      
+      // Show success message
+      alert(`✅ ลบอีเมลทั้งหมดสำเร็จ!\n\nลบไป ${result.deletedCount} อีเมล\nลบไฟล์แนบ ${result.deletedAttachments} ไฟล์`)
+      
+    } catch (err) {
+      console.error('❌ Delete all emails error:', err)
+      setError(`❌ ลบอีเมลทั้งหมดไม่สำเร็จ: ${err.message}`)
+      alert(`❌ ลบอีเมลทั้งหมดไม่สำเร็จ:\n${err.message}`)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   useEffect(() => {
     fetchItems()
   }, [fetchItems])
@@ -180,6 +242,15 @@ export default function ReviewQueue({ onOpenEmail }) {
           </button>
           <button type="button" className="secondary-button" onClick={fetchItems} disabled={isLoading}>
             🔄 รีเฟรช
+          </button>
+          <button 
+            type="button" 
+            className="danger-button" 
+            onClick={handleDeleteAllEmails} 
+            disabled={isLoading || items.length === 0}
+            title="ลบอีเมลทั้งหมด"
+          >
+            🗑️ ลบทั้งหมด
           </button>
         </div>
       </div>
@@ -320,7 +391,7 @@ export default function ReviewQueue({ onOpenEmail }) {
         
         {!isLoading && !currentAccount && (
           <div className="no-accounts">
-            <p>ไม่พบบัญชีที่เลือกใช้งาน</p>
+            <p>ไม่พบอีเมลในบัญชีที่เลือกใช้งาน</p>
           </div>
         )}
       </div>
@@ -549,6 +620,25 @@ export default function ReviewQueue({ onOpenEmail }) {
 
         .secondary-button:hover {
           background: #545b62;
+        }
+
+        .secondary-button:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .danger-button {
+          background: #dc3545;
+          color: white;
+        }
+
+        .danger-button:hover {
+          background: #c82333;
+        }
+
+        .danger-button:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
         }
 
         .secondary-button:disabled {

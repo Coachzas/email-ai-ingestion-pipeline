@@ -53,6 +53,8 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
 
         // ดึง UID ของอีเมลตามเงื่อนไข
         const uids = await client.search(searchQuery);
+        console.log(`🔍 Search query:`, searchQuery);
+        console.log(`🔍 Total UIDs found: ${Array.isArray(uids) ? uids.length : (uids ? Object.keys(uids).length : 0)}`);
         
         // ตรวจสอบและแปลงให้เป็น array
         let uidArray = [];
@@ -64,8 +66,10 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
             uidArray = [uids];
         }
         
-        const lastUids = uidArray.slice(-100); // limit to last 100 matching
-        console.log(`📧 Found ${lastUids.length} matching emails`);
+        console.log(`📊 UID array length: ${uidArray.length}`);
+        const lastUids = uidArray; // use all UIDs without limit
+        console.log(`📧 Found ${lastUids.length} matching emails (no limit)`);
+        console.log(`📊 UID range: ${lastUids.length > 0 ? `${lastUids[0]} - ${lastUids[lastUids.length - 1]}` : 'No UIDs'}`);
 
         // ถ้าเป็น preview mode ให้คืนค่าอีเมลโดยไม่บันทึก
         if (previewMode) {

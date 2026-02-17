@@ -14,6 +14,7 @@ const EmailDetails = lazy(() => import('./components/EmailDetails.jsx'))
 export default function App() {
   const [reviewEmailId, setReviewEmailId] = useState(null)
   const [currentView, setCurrentView] = useState('pipeline') // 'pipeline' or 'accounts'
+  const [displayLimit, setDisplayLimit] = useState('all') // Limit for displaying in EmailSelection ('all' for no limit)
 
   const {
     startDate,
@@ -77,7 +78,7 @@ export default function App() {
               className={`nav-button ${currentView === 'pipeline' ? 'active' : ''}`}
               onClick={() => setCurrentView('pipeline')}
             >
-              📥 ดึงอีเมล
+              📧 จัดการอีเมล
             </button>
             <button 
               className={`nav-button ${currentView === 'accounts' ? 'active' : ''}`}
@@ -134,6 +135,7 @@ export default function App() {
                   aria-describedby="end-date-description"
                 />
               </label>
+              <div className="fetch-email-container">
               <button 
                 type="submit" 
                 disabled={!isFormValid || isLoading}
@@ -141,6 +143,25 @@ export default function App() {
               >
                 {buttonText}
               </button>
+              <select 
+                value={displayLimit} 
+                onChange={(e) => setDisplayLimit(e.target.value)}
+                style={{ 
+                  marginLeft: '8px', 
+                  padding: '4px 8px', 
+                  fontSize: '12px',
+                  borderRadius: '4px',
+                  border: '1px solid #ccc',
+                  backgroundColor: '#f8f9fa'
+                }}
+              >
+                <option value="all">แสดงทั้งหมด</option>
+                <option value={200}>แสดง: 200</option>
+                <option value={100}>แสดง: 100</option>
+                <option value={50}>แสดง: 50</option>
+                <option value={10}>แสดง: 10</option>
+              </select>
+            </div>
             </form>
 
             <div id="log" role="log" aria-live="polite">
@@ -175,6 +196,7 @@ export default function App() {
                   isLoading={isLoading}
                   onClose={hideEmailSelectionModal}
                   onSaveSelected={saveSelectedEmails}
+                  emailLimit={displayLimit}
                 />
               </Suspense>
             )}
@@ -187,6 +209,34 @@ export default function App() {
           <ReviewEmailModal emailId={reviewEmailId} onClose={closeReviewEmail} />
         )}
       </div>
+
+      <style jsx>{`
+        .fetch-email-container {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .fetch-email-container select {
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          padding: 6px 12px;
+          font-size: 12px;
+          background: white;
+          cursor: pointer;
+          transition: border-color 0.2s;
+        }
+
+        .fetch-email-container select:hover {
+          border-color: #007bff;
+        }
+
+        .fetch-email-container select:focus {
+          outline: none;
+          border-color: #007bff;
+          box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }
+      `}</style>
     </ErrorBoundary>
   )
 }
