@@ -18,6 +18,9 @@ CREATE TABLE "Attachment" (
     "fileName" TEXT NOT NULL,
     "fileType" TEXT NOT NULL,
     "filePath" TEXT NOT NULL,
+    "size" INTEGER,
+    "extractedText" TEXT,
+    "ocrStatus" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Attachment_pkey" PRIMARY KEY ("id")

@@ -7,6 +7,7 @@ const ocrRoutes = require('./routes/ocr.routes');
 const reviewRoutes = require('./routes/review.routes');
 const ocrProgressRoutes = require('./routes/ocr-progress.routes');
 const emailProgressRoutes = require('./routes/email-progress.routes');
+const accountRoutes = require('./routes/account.routes');
 
 const path = require('path');
 
@@ -27,6 +28,8 @@ app.use('/api/review', reviewRoutes);
 app.use('/api/ocr-progress', ocrProgressRoutes);
 // Email Progress routes
 app.use('/api/email-progress', emailProgressRoutes);
+// Account routes
+app.use('/api/accounts', accountRoutes);
 
 // default page
 app.get('/', (req, res) => {

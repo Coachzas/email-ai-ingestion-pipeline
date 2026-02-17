@@ -5,15 +5,26 @@ const path = require('path');
 const prisma = require('../utils/prisma');
 
 //ฟังก์ชันสำหรับเชื่อมต่อและดึงข้อมูลอีเมล ผ่านไลบรารีที่ชื่อว่า Imapflow
-async function fetchEmails(startDate, endDate, previewMode = false) {
-    const client = new ImapFlow({ // configure การเชื่อมต่อ ดึงค่ามาจากไฟล์ .env
+async function fetchEmails(startDate, endDate, previewMode = false, accountConfig = null) {
+    // Use provided account config or fall back to environment variables
+    const config = accountConfig || {
         host: process.env.IMAP_HOST,
         port: process.env.IMAP_PORT,
         secure: true,
-        auth: { // (Authentication) จาก user/pass ที่ส่งไป
+        auth: {
             user: process.env.IMAP_USER,
             pass: process.env.IMAP_PASS,
-        },
+        }
+    };
+
+    const client = new ImapFlow({
+        host: config.host,
+        port: config.port,
+        secure: config.secure,
+        auth: config.auth,
+        timeout: 30000, // 30 seconds timeout
+        connectionTimeout: 30000,
+        authTimeout: 15000,
     });
 
     try {
@@ -22,12 +33,19 @@ async function fetchEmails(startDate, endDate, previewMode = false) {
         await client.mailboxOpen('INBOX');
         console.log('✅ IMAP connected');
 
-        // Build search query - support optional date range
+        // Build search query - support optional date range with timezone fix
         let searchQuery;
         if (startDate || endDate) {
             searchQuery = {};
-            if (startDate) searchQuery.since = new Date(startDate);
-            if (endDate) searchQuery.before = new Date(endDate);
+            if (startDate) {
+                // Fix timezone issue: IMAP since cuts at 00:00 UTC, 
+                // so we go back 1 day as safety margin to catch Thai afternoon/evening emails
+                const safetyDate = new Date(startDate);
+                safetyDate.setDate(safetyDate.getDate() - 1);
+                searchQuery.since = safetyDate.toISOString().split('T')[0];
+                console.log(`🔎 Adjusted startDate from ${startDate} to ${searchQuery.since} (timezone safety margin)`);
+            }
+            if (endDate) searchQuery.before = endDate;
             console.log('🔎 Searching emails with date range:', searchQuery);
         } else {
             searchQuery = { all: true };
@@ -35,7 +53,18 @@ async function fetchEmails(startDate, endDate, previewMode = false) {
 
         // ดึง UID ของอีเมลตามเงื่อนไข
         const uids = await client.search(searchQuery);
-        const lastUids = uids.slice(-100); // limit to last 100 matching
+        
+        // ตรวจสอบและแปลงให้เป็น array
+        let uidArray = [];
+        if (Array.isArray(uids)) {
+            uidArray = uids;
+        } else if (uids && typeof uids === 'object') {
+            uidArray = Object.values(uids);
+        } else if (uids) {
+            uidArray = [uids];
+        }
+        
+        const lastUids = uidArray.slice(-100); // limit to last 100 matching
         console.log(`📧 Found ${lastUids.length} matching emails`);
 
         // ถ้าเป็น preview mode ให้คืนค่าอีเมลโดยไม่บันทึก
@@ -112,6 +141,7 @@ async function fetchEmails(startDate, endDate, previewMode = false) {
                         subject: parsed.subject || '',
                         bodyText: parsed.text || '',
                         receivedAt: parsed.date || new Date(),
+                        accountId: accountConfig?.id || null
                     }, // การใช้ || '' หรือ || new Date(): เป็นการป้องกัน Error (Fallback) ในกรณีที่อีเมลฉบับนั้นไม่มีหัวข้อ หรือไม่มีวันที่ส่งมา
                 });
 
@@ -156,12 +186,21 @@ async function fetchEmails(startDate, endDate, previewMode = false) {
         console.log('✅ IMAP fetch completed');
         
         // Return list of fetched emails for controller to reference
+        const dateFilter = {};
+        if (startDate) {
+            const start = new Date(startDate);
+            start.setHours(0, 0, 0, 0); // Start of day in local timezone
+            dateFilter.gte = start;
+        }
+        if (endDate) {
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999); // End of day in local timezone
+            dateFilter.lte = end;
+        }
+
         const fetchedEmailIds = await prisma.email.findMany({
             where: {
-                receivedAt: {
-                    gte: startDate ? new Date(startDate) : undefined,
-                    lte: endDate ? new Date(endDate) : undefined
-                }
+                receivedAt: Object.keys(dateFilter).length > 0 ? dateFilter : undefined
             },
             select: { id: true }
         });
@@ -173,15 +212,23 @@ async function fetchEmails(startDate, endDate, previewMode = false) {
     }
 }
 
-async function fetchEmailByUid(uid) {
-    const client = new ImapFlow({
+async function fetchEmailByUid(uid, accountConfig = null) {
+    // Use provided account config or fall back to environment variables
+    const config = accountConfig || {
         host: process.env.IMAP_HOST,
         port: process.env.IMAP_PORT,
         secure: true,
         auth: {
             user: process.env.IMAP_USER,
             pass: process.env.IMAP_PASS,
-        },
+        }
+    };
+
+    const client = new ImapFlow({
+        host: config.host,
+        port: config.port,
+        secure: config.secure,
+        auth: config.auth,
     });
 
     try {

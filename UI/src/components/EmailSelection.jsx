@@ -49,7 +49,12 @@ const EmailSelection = ({
       <div className="modal-content email-selection-modal">
         <div className="modal-header">
           <h2>📧 เลือกอีเมลที่ต้องการบันทึก</h2>
-          <button onClick={onClose} className="close-btn" aria-label="ปิด">
+          <button 
+            onClick={onClose} 
+            className="close-btn" 
+            aria-label="ปิด"
+            disabled={isLoading}
+          >
             ×
           </button>
         </div>
@@ -64,6 +69,7 @@ const EmailSelection = ({
             <button 
               onClick={handleSelectAll}
               className="select-all-btn"
+              disabled={isLoading}
             >
               {selectAll ? 'ยกเลิกการเลือกทั้งหมด' : 'เลือกทั้งหมด'}
             </button>
@@ -80,15 +86,16 @@ const EmailSelection = ({
             {emails.map((email) => (
               <div 
                 key={email.tempId}
-                className={`email-item selectable ${selectedEmails.has(email.tempId) ? 'selected' : ''}`}
-                onClick={() => handleToggleEmail(email.tempId)}
+                className={`email-item selectable ${selectedEmails.has(email.tempId) ? 'selected' : ''} ${isLoading ? 'disabled' : ''}`}
+                onClick={() => !isLoading && handleToggleEmail(email.tempId)}
               >
                 <div className="email-item-header">
                   <input
                     type="checkbox"
                     checked={selectedEmails.has(email.tempId)}
-                    onChange={() => handleToggleEmail(email.tempId)}
+                    onChange={() => !isLoading && handleToggleEmail(email.tempId)}
                     className="email-checkbox"
+                    disabled={isLoading}
                   />
                   <div className="email-content">
                     <div className="email-header">{email.subject}</div>

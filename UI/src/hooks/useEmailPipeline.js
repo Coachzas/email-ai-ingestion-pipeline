@@ -138,12 +138,21 @@ export const useEmailPipeline = () => {
     setState(prev => ({ ...prev, isLoading: true, error: null, log: 'กำลังเชื่อมต่อ IMAP...\n' }))
     
     try {
+      // Adjust dates for proper timezone handling
+      let adjustedStartDate = state.startDate;
+      let adjustedEndDate = state.endDate;
+      
+      if (state.startDate && state.endDate && state.startDate === state.endDate) {
+        // When same date, add time range to include entire day
+        adjustedEndDate = `${state.endDate}T23:59:59.999+07:00`;
+      }
+      
       const response = await fetch('/api/ingest/fetch-emails-preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          startDate: state.startDate || undefined,
-          endDate: state.endDate || undefined
+          startDate: adjustedStartDate || undefined,
+          endDate: adjustedEndDate || undefined
         })
       })
       
@@ -201,7 +210,7 @@ export const useEmailPipeline = () => {
         previewEmails: null,
         log: `${prev.log}${data.message}\n` +
             `✅ บันทึกอีเมล ${data.savedCount || 0} ฉบับเสร็จแล้ว\n` +
-            `⏭️ ข้าม ${data.skippedCount || 0} ฉบับที่ซ้ำ/ผิดพลาด\n` +
+            `⏭️ ข้าม ${data.skippedCount || 0} ฉบับที่ซ้ำ\n` +
             `📎 บันทึกไฟล์แนบ ${data.attachmentSavedCount || 0} ไฟล์ (ข้าม ${data.attachmentSkippedCount || 0} ไฟล์)\n`
       }))
       
@@ -230,6 +239,7 @@ export const useEmailPipeline = () => {
     resetState,
     setSearchTerm,
     setEmailSummary,
-    fetchEmailSummary
+    fetchEmailSummary,
+    emailProgress: state.emailProgress
   }
 }

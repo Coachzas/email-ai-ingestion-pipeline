@@ -154,7 +154,7 @@ async function startOcrWithProgress(req, res) {
     broadcastProgress(ocrProgress);
 
     // Start processing in background
-    processAttachmentsWithProgress(10)
+    processAttachmentsWithProgress(30)
       .then(result => {
         console.log('✅ OCR processing completed:', result);
         ocrProgress.isProcessing = false;

@@ -30,8 +30,23 @@ async function listEmails(req, res) {
     const skip = Math.max(safeParseInt(offset, 0), 0);
 
     const receivedAtFilter = {};
-    if (fromDate) receivedAtFilter.gte = new Date(fromDate);
-    if (toDate) receivedAtFilter.lte = new Date(toDate);
+    if (fromDate) {
+      const startDate = new Date(fromDate);
+      // Set to start of day in local timezone (Thailand UTC+7)
+      startDate.setHours(0, 0, 0, 0);
+      receivedAtFilter.gte = startDate;
+    }
+    if (toDate) {
+      const endDate = new Date(toDate);
+      // If it's just a date (no time), set to end of day in local timezone
+      if (toDate.includes('T')) {
+        receivedAtFilter.lte = endDate;
+      } else {
+        // Set to end of day (23:59:59.999) in local timezone
+        endDate.setHours(23, 59, 59, 999);
+        receivedAtFilter.lte = endDate;
+      }
+    }
 
     const where = {
       ...(Object.keys(receivedAtFilter).length > 0 ? { receivedAt: receivedAtFilter } : {}),

@@ -6,6 +6,7 @@ import EmailSelection from './components/EmailSelection.jsx'
 import ReviewQueue from './components/ReviewQueue.jsx'
 import ReviewEmailModal from './components/ReviewEmailModal.jsx'
 import EmailProgressIndicator from './components/EmailProgressIndicator.jsx'
+import AccountManager from './components/AccountManager.jsx'
 import { useEmailPipeline } from './hooks/useEmailPipeline'
 
 // Lazy load components
@@ -13,6 +14,7 @@ const EmailDetails = lazy(() => import('./components/EmailDetails.jsx'))
 
 export default function App() {
   const [reviewEmailId, setReviewEmailId] = useState(null)
+  const [currentView, setCurrentView] = useState('pipeline') // 'pipeline' or 'accounts'
 
   const {
     startDate,
@@ -73,7 +75,23 @@ export default function App() {
       <div className="container">
         <header>
           <h1>📧 Email AI Pipeline</h1>
-          <p>เลือกช่วงวันที่เพื่อดึงอีเมลจาก IMAP</p>
+          <nav className="main-nav">
+            <button 
+              className={`nav-button ${currentView === 'pipeline' ? 'active' : ''}`}
+              onClick={() => setCurrentView('pipeline')}
+            >
+              📥 ดึงอีเมล
+            </button>
+            <button 
+              className={`nav-button ${currentView === 'accounts' ? 'active' : ''}`}
+              onClick={() => setCurrentView('accounts')}
+            >
+              🔧 จัดการบัญชี
+            </button>
+          </nav>
+          {currentView === 'pipeline' && (
+            <p>เลือกช่วงวันที่เพื่อดึงอีเมลจาก IMAP</p>
+          )}
         </header>
 
         {error && (
@@ -94,80 +112,87 @@ export default function App() {
           </div>
         )}
 
-        <form className="controls" onSubmit={(e) => { e.preventDefault(); fetchEmailsPreview(); }}>
-          <label>
-            เริ่มต้น
-            <input 
-              type="date" 
-              value={startDate} 
-              onChange={handleStartDateChange} 
-              disabled={isLoading}
-              aria-label="วันที่เริ่มต้น"
-              aria-describedby="start-date-description"
-            />
-          </label>
-          <label>
-            สิ้นสุด
-            <input 
-              type="date" 
-              value={endDate} 
-              onChange={handleEndDateChange} 
-              disabled={isLoading}
-              aria-label="วันที่สิ้นสุด"
-              aria-describedby="end-date-description"
-            />
-          </label>
-          <button 
-            type="submit" 
-            disabled={!isFormValid || isLoading}
-            aria-describedby="submit-description"
-          >
-            {buttonText}
-          </button>
-        </form>
+        {currentView === 'pipeline' ? (
+          <>
+            <form className="controls" onSubmit={(e) => { e.preventDefault(); fetchEmailsPreview(); }}>
+              <label>
+                เริ่มต้น
+                <input 
+                  type="date" 
+                  value={startDate} 
+                  onChange={handleStartDateChange} 
+                  disabled={isLoading}
+                  aria-label="วันที่เริ่มต้น"
+                  aria-describedby="start-date-description"
+                />
+              </label>
+              <label>
+                สิ้นสุด
+                <input 
+                  type="date" 
+                  value={endDate} 
+                  onChange={handleEndDateChange} 
+                  disabled={isLoading}
+                  aria-label="วันที่สิ้นสุด"
+                  aria-describedby="end-date-description"
+                />
+              </label>
+              <button 
+                type="submit" 
+                disabled={!isFormValid || isLoading}
+                aria-describedby="submit-description"
+              >
+                {buttonText}
+              </button>
+            </form>
 
-        <div id="log" role="log" aria-live="polite">
-          <SearchableLog 
-            log={log} 
-            searchTerm={searchTerm} 
-            onSearchChange={setSearchTerm} 
-          />
-        </div>
+            <div id="log" role="log" aria-live="polite">
+              <SearchableLog 
+                log={log} 
+                searchTerm={searchTerm} 
+                onSearchChange={setSearchTerm} 
+              />
+            </div>
 
-        <ReviewQueue onOpenEmail={openReviewEmail} />
-
-        {showEmailDetails && lastFetchedEmails && (
-          <Suspense fallback={<div className="modal-loading"><LoadingSpinner message="กำลังโหลด..." /></div>}>
-            <EmailDetails 
-              emails={lastFetchedEmails.emails}
-              onClose={hideEmailDetailsModal}
+            {/* Email Progress Indicator */}
+            <EmailProgressIndicator 
+              isProcessing={emailProgress.isProcessing}
+              progress={emailProgress.progress}
+              currentEmail={emailProgress.currentEmail}
+              totalEmails={emailProgress.totalEmails}
+              processed={emailProgress.processed}
+              errors={emailProgress.errors}
             />
-          </Suspense>
-        )}
 
-        {showEmailSelection && previewEmails && (
-          <Suspense fallback={<div className="modal-loading"><LoadingSpinner message="กำลังโหลด..." /></div>}>
-            <EmailSelection 
-              emails={previewEmails}
-              isLoading={isLoading}
-              onClose={hideEmailSelectionModal}
-              onSaveSelected={saveSelectedEmails}
-            />
-          </Suspense>
+            <ReviewQueue onOpenEmail={openReviewEmail} />
+
+            {showEmailDetails && lastFetchedEmails && (
+              <Suspense fallback={<div className="modal-loading"><LoadingSpinner message="กำลังโหลด..." /></div>}>
+                <EmailDetails 
+                  emails={lastFetchedEmails.emails}
+                  onClose={hideEmailDetailsModal}
+                />
+              </Suspense>
+            )}
+
+            {showEmailSelection && previewEmails && (
+              <Suspense fallback={<div className="modal-loading"><LoadingSpinner message="กำลังโหลด..." /></div>}>
+                <EmailSelection 
+                  emails={previewEmails}
+                  isLoading={isLoading}
+                  onClose={hideEmailSelectionModal}
+                  onSaveSelected={saveSelectedEmails}
+                />
+              </Suspense>
+            )}
+          </>
+        ) : (
+          <AccountManager />
         )}
 
         {reviewEmailId && (
           <ReviewEmailModal emailId={reviewEmailId} onClose={closeReviewEmail} />
         )}
-
-        <EmailProgressIndicator 
-          isProcessing={emailProgress.isProcessing}
-          progress={emailProgress.progress}
-          currentEmail={emailProgress.currentEmail}
-          totalEmails={emailProgress.totalEmails}
-          processed={emailProgress.processed}
-          errors={emailProgress.errors}
-        />
       </div>
     </ErrorBoundary>
   )

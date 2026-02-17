@@ -5,49 +5,60 @@ const prisma = require('../utils/prisma');
 /**
  * Extract text from file based on type
  */
-async function extractText(file) {
+async function extractText(file, attachmentId = null) {
   const { filePath, fileType, originalName } = file;
 
   try {
+    console.log(`🔍 Extracting text from: ${originalName} (${fileType})`);
+    
     // ---------- IMAGE FILES ----------
     if (fileType.startsWith('image/')) {
+      console.log(`📷 Processing image file: ${originalName}`);
       return await runOCR(filePath);
     }
 
     // ---------- PDF ----------
     if (fileType === 'application/pdf') {
+      console.log(`📄 Processing PDF file: ${originalName}`);
       // PDF extraction now handles both text and scanned PDFs
-      let text = await extractors.pdf(filePath);
+      let text = await extractors.pdf(filePath, attachmentId);
       return text;
     }
 
     // ---------- TEXT DOCUMENTS ----------
     if (fileType === 'text/csv') {
+      console.log(`📊 Processing CSV file: ${originalName}`);
       return await extractors.csv(filePath);
     }
 
     if (
       fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     ) {
+      console.log(`📝 Processing DOCX file: ${originalName}`);
       return await extractors.docx(filePath);
     }
 
     if (
       fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     ) {
+      console.log(`📊 Processing XLSX file: ${originalName}`);
       return await extractors.xlsx(filePath);
     }
 
     if (
       fileType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
     ) {
+      console.log(`📊 Processing PPTX file: ${originalName}`);
       return await extractors.pptx(filePath);
     }
 
-    // Unsupported file type
+    // Default case
+    console.log(`⚠️ Unsupported file type: ${fileType} for file: ${originalName}`);
     return '';
-  } catch (err) {
-    throw new Error(`extractText failed for ${originalName}: ${err.message}`);
+    
+  } catch (error) {
+    console.error(`❌ Error extracting text from ${originalName}:`, error);
+    return '';
   }
 }
 
@@ -107,8 +118,8 @@ async function processAttachmentsOCR(limit = 30) {
         originalName: att.fileName 
       };
 
-      // Extract with timeout (30s)
-      const extractPromise = extractText(file);
+      // Extract with timeout (30s for OCR processing)
+      const extractPromise = extractText(file, att.id);
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Extraction timeout (>30s)')), 30000)
       );
@@ -122,12 +133,34 @@ async function processAttachmentsOCR(limit = 30) {
         errors++;
       }
 
-      await prisma.attachment.update({
-        where: { id: att.id },
-        data: { extractedText: text || '' },
-      });
-
       const hasText = text && text.trim().length > 0;
+      
+      // อัปเดต extractedText ใน database ด้วยข้อมูลจริง
+      if (hasText) {
+        try {
+          await prisma.attachment.update({
+            where: { id: att.id },
+            data: { 
+              extractedText: text,
+              ocrStatus: 'COMPLETED'
+            }
+          });
+          console.log(`  📊 Updated extracted text for ${att.fileName}: ${text.length} characters`);
+        } catch (updateErr) {
+          console.warn(`  ⚠️ Failed to update extracted text: ${updateErr.message}`);
+        }
+      } else {
+        // ถ้าไม่มีข้อความ ก็อัปเดตสถานะ COMPLETED
+        try {
+          await prisma.attachment.update({
+            where: { id: att.id },
+            data: { ocrStatus: 'COMPLETED' }
+          });
+        } catch (updateErr) {
+          console.warn(`  ⚠️ Failed to update status: ${updateErr.message}`);
+        }
+      }
+      
       results.push({
         fileName: att.fileName,
         fileType: att.fileType,
@@ -166,4 +199,7 @@ async function processAttachmentsOCR(limit = 30) {
   return { ...summary };
 }
 
-module.exports = { processAttachmentsOCR };
+
+module.exports = { 
+  processAttachmentsOCR
+};

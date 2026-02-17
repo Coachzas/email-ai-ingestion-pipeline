@@ -54,6 +54,7 @@ export default function ReviewEmailModal({ emailId, onClose }) {
     }
   }, [emailId])
 
+
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true">
       <div className="modal-content modal-large">

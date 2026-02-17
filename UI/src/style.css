@@ -22,6 +22,47 @@ header h1 { margin: 0 0 8px 0; color: #ffffff; }
 
 header p { margin: 0; color: #cccccc; }
 
+/* Main Navigation */
+.main-nav {
+  display: flex;
+  gap: 12px;
+  margin: 12px 0;
+  border-bottom: 1px solid #333333;
+  padding-bottom: 12px;
+}
+
+.nav-button {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid #333333;
+  border-radius: 6px;
+  background: transparent;
+  color: #cccccc;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-button:hover {
+  background: #333333;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.nav-button.active {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: white;
+}
+
+.nav-button.active:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+
 
 
 .controls { 
@@ -102,8 +143,31 @@ input[type="date"]:disabled {
 
 
 
-button { 
+.attachment-ocr-btn {
+  background: #f59e0b;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  margin-left: 8px;
+}
 
+.attachment-ocr-btn:hover:not(:disabled) {
+  background: #d97706;
+}
+
+.attachment-ocr-btn:disabled {
+  background: #666666;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+
+button { 
   padding: 10px 16px; 
 
   font-size: 14px; 
@@ -149,54 +213,6 @@ button:hover:not(:disabled) {
 button:active:not(:disabled) {
 
   transform: translateY(0);
-
-}
-
-
-
-button:disabled { 
-
-  background: #9ca3af; 
-
-  border-color: #9ca3af;
-
-  cursor: not-allowed; 
-
-  transform: none;
-
-  box-shadow: none;
-
-}
-
-
-
-.secondary-button {
-
-  background: #ffffff;
-
-  color: #dc2626;
-
-  border-color: #dc2626;
-
-}
-
-
-
-.secondary-button:hover:not(:disabled) {
-
-  background: #dc2626;
-
-  color: white;
-
-  transform: translateY(-1px);
-
-  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
-
-}
-
-
-
-.error-message {
 
   display: flex;
 

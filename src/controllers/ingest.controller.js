@@ -12,162 +12,152 @@ const {
   incrementErrors 
 } = require('./email-progress.controller');
 
-
-
 async function runFetch(req, res) {
 
     try {
-
         const { startDate, endDate } = req.body || {};
 
         console.log('📥 Fetching emails...', { startDate, endDate });
 
+        // Get the first active account
+        const account = await prisma.emailAccount.findFirst({
+            where: { status: 'ACTIVE' },
+            select: {
+                id: true,
+                name: true,
+                host: true,
+                port: true,
+                secure: true,
+                username: true,
+                password: true,
+                status: true
+            }
+        });
 
+        if (!account) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'No active email account found. Please configure an email account first.'
+            });
+        }
 
-        // Pass optional date range to fetchEmails
+        // Create account config for IMAP service
+        const accountConfig = {
+            id: account.id,
+            host: account.host,
+            port: account.port,
+            secure: account.secure,
+            auth: {
+                user: account.username,
+                pass: account.password,
+            }
+        };
 
-        const fetchedEmails = await fetchEmails(startDate, endDate);
-
-
-
-        console.log('🧠 Running OCR on attachments...');
-
-        const ocrResult = await processAttachmentsOCR(10);
-
-
-
+        // Pass optional date range to fetchEmails (preview mode)
+        const fetchedEmails = await fetchEmails(startDate, endDate, true, accountConfig);
+        console.log('✅ Email preview completed');
         // Query emails with attachments to return in response
 
         let emailsWithAttachments = [];
-
         if (fetchedEmails && fetchedEmails.length > 0) {
-
             emailsWithAttachments = await prisma.email.findMany({
-
                 where: {
-
                     id: { in: fetchedEmails.map(e => e.id) }
 
                 },
-
                 include: {
-
-                    attachments: true
-
+                attachments: true
                 }
-
             });
-
         }
-
-
-
         res.json({
-
             status: 'success',
-
             message: 'ดึงอีเมล + OCR เสร็จแล้ว',
-
             emailCount: emailsWithAttachments.length,
-
             emails: emailsWithAttachments.map(email => ({
-
                 id: email.id,
-
                 imapUid: email.imapUid,
-
                 fromEmail: email.fromEmail,
-
                 subject: email.subject,
-
                 receivedAt: email.receivedAt,
-
                 attachmentCount: email.attachments.length,
-
                 attachments: email.attachments.map(att => ({
-
                     fileName: att.fileName,
-
                     fileType: att.fileType,
-
                     hasExtractedText: !!att.extractedText
-
                 }))
-
             })),
 
-            ocr: ocrResult,
-
             startDate: startDate || null,
-
             endDate: endDate || null
-
         });
-
     } catch (err) {
-
         console.error('PIPELINE ERROR:', err);
-
         res.status(500).json({
-
             status: 'error',
-
             message: err.message,
 
         });
-
     }
-
 }
-
-
-
 async function fetchEmailsPreview(req, res) {
-
     try {
-
         const { startDate, endDate } = req.body || {};
-
         console.log('🔍 Fetching emails preview...', { startDate, endDate });
 
+        // Get the first active account
+        const account = await prisma.emailAccount.findFirst({
+            where: { status: 'ACTIVE' },
+            select: {
+                id: true,
+                name: true,
+                host: true,
+                port: true,
+                secure: true,
+                username: true,
+                password: true,
+                status: true
+            }
+        });
 
+        if (!account) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'No active email account found. Please configure an email account first.'
+            });
+        }
+
+        // Create account config for IMAP service
+        const accountConfig = {
+            id: account.id,
+            host: account.host,
+            port: account.port,
+            secure: account.secure,
+            auth: {
+                user: account.username,
+                pass: account.password,
+            }
+        };
 
         // ดึงอีเมลจาก IMAP แต่ยังไม่บันทึกลงฐานข้อมูล
-
-        const emails = await fetchEmails(startDate, endDate, true); // true = preview mode
-
-
-
+        const emails = await fetchEmails(startDate, endDate, true, accountConfig); // true = preview mode
         console.log(`📧 Got ${emails.length} emails for preview`);
-
-
-
         res.json({
 
             status: 'success',
-
             message: 'ดึงอีเมลตัวอย่างเสร็จแล้ว',
-
             emails: emails.map(email => {
-
                 console.log(`📋 Email: ${email.subject} (${email.from}) - ${email.attachmentCount} attachments`);
 
                 return {
 
                     // ใช้ข้อมูลจาก IMAP โดยตรง ยังไม่มี ID
-
                     tempId: `${email.imapUid}_${email.date}`,
-
                     imapUid: email.imapUid,
-
                     fromEmail: email.from,
-
                     subject: email.subject,
-
                     receivedAt: email.date,
-
                     body: email.text || email.html,
-
                     attachmentCount: email.attachments ? email.attachments.length : 0,
 
                     attachments: email.attachments || []
@@ -210,6 +200,40 @@ async function saveSelectedEmails(req, res) {
 
         console.log(`💾 Saving selected emails...`);
         console.log('📋 Request body:', JSON.stringify(req.body, null, 2));
+
+        // Get the first active account for now
+        const account = await prisma.emailAccount.findFirst({
+            where: { status: 'ACTIVE' },
+            select: {
+                id: true,
+                name: true,
+                host: true,
+                port: true,
+                secure: true,
+                username: true,
+                password: true,
+                status: true
+            }
+        });
+
+        if (!account) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'No active email account found. Please configure an email account first.'
+            });
+        }
+
+        // Create account config for IMAP service
+        const accountConfig = {
+            id: account.id,
+            host: account.host,
+            port: account.port,
+            secure: account.secure,
+            auth: {
+                user: account.username,
+                pass: account.password,
+            }
+        };
 
         // รับทั้ง selectedEmails (full objects) หรือ selectedUids (array of numbers)
         let emailsToProcess = selectedEmails;
@@ -278,14 +302,15 @@ async function saveSelectedEmails(req, res) {
                 }
 
                 // ดึงอีเมลจาก IMAP ใหม่เพื่อให้ได้ attachment content จริงๆ (ไม่พึ่งข้อมูลจาก UI)
-                const parsed = await fetchEmailByUid(uid);
+                const parsed = await fetchEmailByUid(uid, accountConfig);
 
                 const emailDataToSave = {
                     imapUid: uid,
                     fromEmail: parsed.from?.text || emailData.fromEmail || '',
                     subject: parsed.subject || emailData.subject || '',
                     bodyText: parsed.text || parsed.html || emailData.body || '',
-                    receivedAt: parsed.date || (emailData.receivedAt ? new Date(emailData.receivedAt) : new Date())
+                    receivedAt: parsed.date || (emailData.receivedAt ? new Date(emailData.receivedAt) : new Date()),
+                    accountId: account.id
                 };
 
                 const savedEmail = await prisma.email.create({
@@ -351,7 +376,8 @@ async function saveSelectedEmails(req, res) {
 
                 console.log(`✅ Saved email UID: ${uid} (attachments saved: ${attachmentsSavedForThisEmail}, skipped: ${attachmentsSkippedForThisEmail})`);
 
-                // Increment processed count
+                // Update current email and increment processed count
+                updateCurrentEmail(emailData.subject || `UID: ${uid}`);
                 incrementProcessed();
 
                 
@@ -361,256 +387,146 @@ async function saveSelectedEmails(req, res) {
                 console.error(`❌ Failed to save email ${emailData.imapUid}:`, emailErr.message);
 
                 skippedEmails.push({
-
                     imapUid: emailData.imapUid,
-
                     reason: emailErr.message
-
                 });
-
                 incrementErrors();
-
             }
-
         }
-
         // Complete progress tracking
         completeEmailProgress();
 
         let ocrResult = { processed: 0, total: 0 };
 
-        
-
-        // ทำ OCR สำหรับไฟล์แนบที่เพิ่งบันทึก
-
-        if (attachmentStats.saved > 0) {
-
-            console.log('🧠 Running OCR on new attachments...');
-
-            ocrResult = await processAttachmentsOCR(attachmentStats.saved);
-
-        }
-
-
-
         let message = `บันทึกอีเมล ${savedEmails.length} ฉบับเสร็จแล้ว`;
         if (skippedEmails.length > 0) {
             const skippedUids = skippedEmails.map(e => e.imapUid).join(', ');
-            message += ` (ข้าม ${skippedEmails.length} ฉบับที่ซ้ำ/ผิดพลาด: UID ${skippedUids})`;
+            message += ` (ข้าม ${skippedEmails.length} ฉบับที่ซ้ำ: UID ${skippedUids})`;
         }
-
-
-
         res.json({
-
             status: 'success',
-
             message,
-
             savedCount: savedEmails.length,
-
             skippedCount: skippedEmails.length,
-
             attachmentTotalCount: attachmentStats.total,
-
             attachmentSavedCount: attachmentStats.saved,
-
             attachmentSkippedCount: attachmentStats.skipped,
-
             emails: savedEmails.map(email => ({
-
                 id: email.id,
-
                 imapUid: email.imapUid,
-
                 fromEmail: email.fromEmail,
-
                 subject: email.subject,
-
                 receivedAt: email.receivedAt,
-
+                accountId: account.id,
                 attachmentCount: email.attachmentCount
-
             })),
-
             skipped: skippedEmails,
-
             ocr: ocrResult
-
         });
-
     } catch (err) {
-
         console.error('SAVE ERROR:', err);
-
         // Complete progress with error
         completeEmailProgress();
-
         res.status(500).json({
-
             status: 'error',
-
             message: err.message,
-
         });
-
     }
-
 }
-
-
-
 async function getEmailSummary(req, res) {
-
     try {
-
         console.log('📊 Getting email summary...');
-
-
-
         // ดึงข้อมูลอีเมลทั้งหมด
-
         const totalEmails = await prisma.email.count();
 
-        
-
         // ดึงอีเมลที่มีไฟล์แนบ
-
         const emailsWithAttachments = await prisma.email.findMany({
 
             include: {
 
                 attachments: true
-
             }
-
         });
-
-
 
         const emailsWithFilesCount = emailsWithAttachments.filter(email => 
 
             email.attachments.length > 0
 
         ).length;
-
-
-
         const emailsWithoutFilesCount = totalEmails - emailsWithFilesCount;
 
-
-
         // สรุปข้อมูลไฟล์แนบ
-
         const allAttachments = emailsWithAttachments.flatMap(email => email.attachments);
-
         const totalAttachments = allAttachments.length;
-
-
-
         // นับสถานะ OCR
 
         const ocrStats = {
-
             total: totalAttachments,
-
             processed: allAttachments.filter(att => att.extractedText && att.extractedText.trim().length > 0).length,
 
             pending: allAttachments.filter(att => !att.extractedText || att.extractedText.trim() === '').length,
-
             errors: 0 // จะนับจาก file system ต่อไป
-
         };
-
-
-
         // ตรวจสอบไฟล์ที่มีปัญหา
-
         const fs = require('fs');
-
         const problemFiles = [];
-
         for (const att of allAttachments) {
-
             if (!fs.existsSync(att.filePath)) {
-
                 problemFiles.push({
-
                     fileName: att.fileName,
-
                     issue: 'File not found on disk'
-
                 });
-
                 ocrStats.errors++;
-
             }
-
         }
-
-
-
         // จัดกลุ่มตามประเภทไฟล์
-
         const fileTypeStats = {};
-
         allAttachments.forEach(att => {
-
             const type = att.fileType || 'unknown';
-
             fileTypeStats[type] = (fileTypeStats[type] || 0) + 1;
-
         });
-
-
-
         res.json({
-
             status: 'success',
-
             summary: {
-
                 totalEmails,
-
                 emailsWithFiles: emailsWithFilesCount,
-
                 emailsWithoutFiles: emailsWithoutFilesCount,
-
                 attachments: {
-
                     total: totalAttachments,
-
                     ocrStats,
-
                     fileTypeStats,
-
                     problemFiles: problemFiles.slice(0, 10) // แสดง 10 อันแรก
-
                 }
-
             }
-
         });
-
-
-
     } catch (err) {
 
         console.error('SUMMARY ERROR:', err);
-
         res.status(500).json({
-
             status: 'error',
-
             message: err.message,
-
         });
-
     }
-
 }
 
+async function processAttachmentsOCRController(req, res) {
+    try {
+        console.log('🚀 Starting OCR processing via API...');
+        const limit = req.body.limit || 30;
+        const result = await processAttachmentsOCR(limit);
+        
+        res.json({
+            status: 'success',
+            data: result
+        });
+    } catch (err) {
+        console.error('❌ OCR processing error:', err);
+        res.status(500).json({
+            status: 'error',
+            message: err.message
+        });
+    }
+}
 
-
-module.exports = { runFetch, getEmailSummary, fetchEmailsPreview, saveSelectedEmails };
+module.exports = { runFetch, getEmailSummary, fetchEmailsPreview, saveSelectedEmails, processAttachmentsOCR: processAttachmentsOCRController };
 
