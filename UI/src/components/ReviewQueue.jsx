@@ -20,7 +20,6 @@ export default function ReviewQueue({ onOpenEmail }) {
   const [items, setItems] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [ocrResult, setOcrResult] = useState(null)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   
   // Use real-time OCR progress
@@ -89,9 +88,7 @@ export default function ReviewQueue({ onOpenEmail }) {
     }
   }, [queryString])
 
-
   const handleOcrProcess = async () => {
-    setOcrResult(null)
     setError(null)
 
     try {
@@ -103,14 +100,6 @@ export default function ReviewQueue({ onOpenEmail }) {
         if (!progress.isProcessing) {
           clearInterval(checkInterval)
           fetchItems()
-          
-          // Set final result
-          setOcrResult({
-            total: progress.totalFiles,
-            processed: progress.processed,
-            errors: progress.errors,
-            skipped: Math.max(0, progress.totalFiles - progress.processed - progress.errors)
-          })
         }
       }, 2000)
       
@@ -147,7 +136,7 @@ export default function ReviewQueue({ onOpenEmail }) {
       <section className="review-section">
       <div className="review-header">
         <div>
-          <h2>👥 Review Queue</h2>
+          <h2>📝 Email Review Center</h2>
           <p>รายการอีเมลที่บันทึกแล้วสำหรับ HR Review</p>
           {isConnected && (
             <p className="connection-status">🟢 Real-time updates connected</p>
@@ -231,18 +220,6 @@ export default function ReviewQueue({ onOpenEmail }) {
       </div>
 
       {error && <div className="error-message" role="alert">❌ {error.message}</div>}
-
-      {ocrResult && (
-        <div className="ocr-result" role="status">
-          <h4>🔍 ผลการดึงข้อความ</h4>
-          <div className="ocr-stats">
-            <span>✅ ประมวลผล: {ocrResult.processed || 0}</span>
-            <span>⚠️ ข้าม: {ocrResult.skipped || 0}</span>
-            <span>❌ ข้อผิดพลาด: {ocrResult.errors || 0}</span>
-            <span>📊 ทั้งหมด: {ocrResult.total || 0}</span>
-          </div>
-        </div>
-      )}
 
       <div className="review-table-wrapper">
         {currentAccount && (
@@ -469,24 +446,6 @@ export default function ReviewQueue({ onOpenEmail }) {
           padding: 12px;
           border-radius: 4px;
           margin-bottom: 20px;
-        }
-
-        .ocr-result {
-          background: #d4edda;
-          color: #155724;
-          padding: 12px;
-          border-radius: 4px;
-          margin-bottom: 20px;
-        }
-
-        .ocr-result h4 {
-          margin: 0 0 10px 0;
-        }
-
-        .ocr-stats {
-          display: flex;
-          gap: 20px;
-          flex-wrap: wrap;
         }
 
         .badge {

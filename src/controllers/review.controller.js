@@ -160,9 +160,7 @@ async function listEmails(req, res) {
     limit: take,
     offset: skip
   });
-  console.log(`📤 Response sent: ${items.length} items`);
-  console.log('📤 First item account:', items[0]?.account || 'NO ACCOUNT');
-  console.log('📤 Full first item:', JSON.stringify(items[0], null, 2));
+  
 }
 
 async function getEmailDetail(req, res) {

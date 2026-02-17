@@ -129,7 +129,7 @@ async function updateAccount(req, res) {
     if (port !== undefined) updateData.port = parseInt(port);
     if (secure !== undefined) updateData.secure = secure;
     if (username !== undefined) updateData.username = username;
-    if (password !== undefined) updateData.password = password;
+    if (password !== undefined && password !== '') updateData.password = password;
     if (status !== undefined) updateData.status = status;
 
     const account = await prisma.emailAccount.update({
