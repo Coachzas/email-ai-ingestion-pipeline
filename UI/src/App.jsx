@@ -1,7 +1,6 @@
 import React, { useMemo, useEffect, lazy, Suspense, useState } from 'react'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import LoadingSpinner from './components/LoadingSpinner.jsx'
-import SearchableLog from './components/SearchableLog.jsx'
 import EmailSelection from './components/EmailSelection.jsx'
 import ReviewQueue from './components/ReviewQueue.jsx'
 import ReviewEmailModal from './components/ReviewEmailModal.jsx'
@@ -24,7 +23,6 @@ export default function App() {
     error,
     lastFetchedEmails,
     showEmailDetails,
-    searchTerm,
     emailSummary,
     previewEmails,
     showEmailSelection,
@@ -37,7 +35,6 @@ export default function App() {
     showEmailDetailsModal,
     hideEmailDetailsModal,
     hideEmailSelectionModal,
-    setSearchTerm,
     fetchEmailSummary
   } = useEmailPipeline()
 
@@ -147,11 +144,7 @@ export default function App() {
             </form>
 
             <div id="log" role="log" aria-live="polite">
-              <SearchableLog 
-                log={log} 
-                searchTerm={searchTerm} 
-                onSearchChange={setSearchTerm} 
-              />
+              <pre>{log}</pre>
             </div>
 
             {/* Email Progress Indicator */}

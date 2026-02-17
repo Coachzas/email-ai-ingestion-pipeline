@@ -9,7 +9,6 @@ export const useEmailPipeline = () => {
     error: null,
     lastFetchedEmails: null,
     showEmailDetails: false,
-    searchTerm: '',
     emailSummary: null,
     previewEmails: null,
     showEmailSelection: false,
@@ -98,7 +97,6 @@ export const useEmailPipeline = () => {
       error: null,
       lastFetchedEmails: null,
       showEmailDetails: false,
-      searchTerm: '',
       emailSummary: null,
       previewEmails: null,
       showEmailSelection: false,
@@ -114,9 +112,6 @@ export const useEmailPipeline = () => {
     })
   }, [])
 
-  const setSearchTerm = useCallback((term) => {
-    setState(prev => ({ ...prev, searchTerm: term }))
-  }, [])
 
   const setEmailSummary = useCallback((summary) => {
     setState(prev => ({ ...prev, emailSummary: summary }))
@@ -237,7 +232,6 @@ export const useEmailPipeline = () => {
     hideEmailDetailsModal,
     hideEmailSelectionModal,
     resetState,
-    setSearchTerm,
     setEmailSummary,
     fetchEmailSummary,
     emailProgress: state.emailProgress

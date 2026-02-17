@@ -66,6 +66,8 @@ model EmailAccount {
 
   status    AccountStatus @default(ACTIVE)
 
+  isSelected Boolean @default(false)
+
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt

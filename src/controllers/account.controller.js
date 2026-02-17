@@ -237,11 +237,123 @@ async function testConnection(req, res) {
   }
 }
 
+// Get currently selected account
+async function getSelectedAccount(req, res) {
+  try {
+    const selectedAccount = await prisma.emailAccount.findFirst({
+      where: { 
+        status: 'ACTIVE',
+        isSelected: true 
+      },
+      select: {
+        id: true,
+        name: true,
+        host: true,
+        port: true,
+        secure: true,
+        username: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        _count: {
+          select: {
+            emails: true
+          }
+        }
+      }
+    });
+
+    // If no selected account, return the first active account
+    if (!selectedAccount) {
+      const firstActive = await prisma.emailAccount.findFirst({
+        where: { status: 'ACTIVE' },
+        select: {
+          id: true,
+          name: true,
+          host: true,
+          port: true,
+          secure: true,
+          username: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+          _count: {
+            select: {
+              emails: true
+            }
+          }
+        }
+      });
+
+      return res.json(firstActive);
+    }
+
+    res.json(selectedAccount);
+  } catch (error) {
+    console.error('Error fetching selected account:', error);
+    res.status(500).json({ error: 'Failed to fetch selected account' });
+  }
+}
+
+// Set selected account
+async function setSelectedAccount(req, res) {
+  try {
+    const { accountId } = req.body;
+
+    if (!accountId) {
+      return res.status(400).json({ error: 'Account ID is required' });
+    }
+
+    // Check if account exists and is active
+    const account = await prisma.emailAccount.findUnique({
+      where: { id: accountId }
+    });
+
+    if (!account) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+
+    if (account.status !== 'ACTIVE') {
+      return res.status(400).json({ error: 'Account is not active' });
+    }
+
+    // Reset all accounts to not selected
+    await prisma.emailAccount.updateMany({
+      where: { status: 'ACTIVE' },
+      data: { isSelected: false }
+    });
+
+    // Set the selected account
+    const updatedAccount = await prisma.emailAccount.update({
+      where: { id: accountId },
+      data: { isSelected: true },
+      select: {
+        id: true,
+        name: true,
+        host: true,
+        port: true,
+        secure: true,
+        username: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    });
+
+    res.json(updatedAccount);
+  } catch (error) {
+    console.error('Error setting selected account:', error);
+    res.status(500).json({ error: 'Failed to set selected account' });
+  }
+}
+
 module.exports = {
   getAccounts,
   getAccount,
   createAccount,
   updateAccount,
   deleteAccount,
-  testConnection
+  testConnection,
+  getSelectedAccount,
+  setSelectedAccount
 };

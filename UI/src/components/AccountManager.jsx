@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 
 export default function AccountManager() {
   const [accounts, setAccounts] = useState([])
+  const [selectedAccount, setSelectedAccount] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [showForm, setShowForm] = useState(false)
@@ -31,6 +32,48 @@ export default function AccountManager() {
       setError(err.message)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const fetchSelectedAccount = async () => {
+    try {
+      const response = await fetch('/api/accounts/selected')
+      if (!response.ok) throw new Error('Failed to fetch selected account')
+      
+      const data = await response.json()
+      setSelectedAccount(data)
+    } catch (err) {
+      console.error('Error fetching selected account:', err)
+    }
+  }
+
+  const selectAccount = async (accountId) => {
+    try {
+      const response = await fetch('/api/accounts/select', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ accountId })
+      })
+      
+      if (!response.ok) {
+        const err = await response.json()
+        throw new Error(err.error || 'Failed to select account')
+      }
+      
+      const updatedAccount = await response.json()
+      setSelectedAccount(updatedAccount)
+      await fetchAccounts() // Refresh accounts to update selection status
+      
+      // Dispatch custom event for other components
+      window.dispatchEvent(new CustomEvent('accountChanged', { 
+        detail: updatedAccount 
+      }))
+      
+      alert('✅ เปลี่ยนบัญชีสำเร็จ')
+    } catch (err) {
+      setError(err.message)
     }
   }
 
@@ -155,6 +198,7 @@ export default function AccountManager() {
 
   useEffect(() => {
     fetchAccounts()
+    fetchSelectedAccount()
   }, [])
 
   return (
@@ -163,6 +207,13 @@ export default function AccountManager() {
         <div>
           <h2>🔧 จัดการบัญชีอีเมล</h2>
           <p>ตั้งค่าบัญชีอีเมลสำหรับดึงข้อมูล</p>
+          {selectedAccount && (
+            <div className="selected-account">
+              <span className="selected-label">📧 บัญชีที่ใช้งานอยู่:</span>
+              <span className="selected-name">{selectedAccount.name}</span>
+              <span className="selected-email">({selectedAccount.username})</span>
+            </div>
+          )}
         </div>
         <button 
           className="primary-button" 
@@ -311,6 +362,15 @@ export default function AccountManager() {
                 </div>
                 
                 <div className="account-actions">
+                  {account.status === 'ACTIVE' && (
+                    <button
+                      className={`select-button small ${selectedAccount?.id === account.id ? 'selected' : ''}`}
+                      onClick={() => selectAccount(account.id)}
+                      disabled={selectedAccount?.id === account.id}
+                    >
+                      {selectedAccount?.id === account.id ? '✅ กำลังใช้งาน' : '📧 เลือกใช้งาน'}
+                    </button>
+                  )}
                   <button
                     className="secondary-button small"
                     onClick={() => handleEdit(account)}
@@ -354,6 +414,31 @@ export default function AccountManager() {
         .account-header p {
           margin: 5px 0 0 0;
           color: #666;
+        }
+
+        .selected-account {
+          margin-top: 10px;
+          padding: 8px 12px;
+          background: #e7f3ff;
+          border: 1px solid #b3d9ff;
+          border-radius: 6px;
+          font-size: 14px;
+        }
+
+        .selected-label {
+          font-weight: 600;
+          color: #0066cc;
+        }
+
+        .selected-name {
+          font-weight: 500;
+          color: #333;
+          margin-left: 5px;
+        }
+
+        .selected-email {
+          color: #666;
+          margin-left: 5px;
         }
 
         .account-form-overlay {
@@ -509,7 +594,7 @@ export default function AccountManager() {
           margin-bottom: 20px;
         }
 
-        .primary-button, .secondary-button, .danger-button {
+        .primary-button, .secondary-button, .danger-button, .select-button {
           padding: 10px 20px;
           border: none;
           border-radius: 4px;
@@ -544,6 +629,24 @@ export default function AccountManager() {
 
         .danger-button:hover {
           background: #c82333;
+        }
+
+        .select-button {
+          background: #28a745;
+          color: white;
+        }
+
+        .select-button:hover {
+          background: #218838;
+        }
+
+        .select-button.selected {
+          background: #17a2b8;
+          cursor: default;
+        }
+
+        .select-button.selected:hover {
+          background: #17a2b8;
         }
 
         .small {

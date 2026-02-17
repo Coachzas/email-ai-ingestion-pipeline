@@ -19,9 +19,12 @@ async function runFetch(req, res) {
 
         console.log('📥 Fetching emails...', { startDate, endDate });
 
-        // Get the first active account
+        // Get the selected account
         const account = await prisma.emailAccount.findFirst({
-            where: { status: 'ACTIVE' },
+            where: { 
+              status: 'ACTIVE',
+              isSelected: true 
+            },
             select: {
                 id: true,
                 name: true,
@@ -105,9 +108,12 @@ async function fetchEmailsPreview(req, res) {
         const { startDate, endDate } = req.body || {};
         console.log('🔍 Fetching emails preview...', { startDate, endDate });
 
-        // Get the first active account
+        // Get the selected account
         const account = await prisma.emailAccount.findFirst({
-            where: { status: 'ACTIVE' },
+            where: { 
+              status: 'ACTIVE',
+              isSelected: true 
+            },
             select: {
                 id: true,
                 name: true,
@@ -201,9 +207,12 @@ async function saveSelectedEmails(req, res) {
         console.log(`💾 Saving selected emails...`);
         console.log('📋 Request body:', JSON.stringify(req.body, null, 2));
 
-        // Get the first active account for now
+        // Get the selected account
         const account = await prisma.emailAccount.findFirst({
-            where: { status: 'ACTIVE' },
+            where: { 
+              status: 'ACTIVE',
+              isSelected: true 
+            },
             select: {
                 id: true,
                 name: true,

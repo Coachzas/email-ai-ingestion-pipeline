@@ -21,6 +21,7 @@ export default function ReviewQueue({ onOpenEmail }) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [ocrResult, setOcrResult] = useState(null)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
   
   // Use real-time OCR progress
   const { progress, isConnected, startOcr } = useOcrProgress()
@@ -30,6 +31,12 @@ export default function ReviewQueue({ onOpenEmail }) {
   const [ocrStatus, setOcrStatus] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+
+  const currentAccount = useMemo(() => {
+    if (!items.length) return null;
+    // All emails are from the same account now, so get account info from first email
+    return items[0]?.account || null;
+  }, [items]);
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams()
@@ -47,7 +54,22 @@ export default function ReviewQueue({ onOpenEmail }) {
     }
 
     return params.toString()
-  }, [q, hasAttachments, ocrStatus, fromDate, toDate])
+  }, [q, hasAttachments, ocrStatus, fromDate, toDate, refreshTrigger])
+
+  // Listen for account change events
+  useEffect(() => {
+    const handleAccountChange = () => {
+      console.log('📧 ReviewQueue: Account changed, refreshing...')
+      setRefreshTrigger(prev => prev + 1)
+    }
+
+    // Create custom event for account changes
+    window.addEventListener('accountChanged', handleAccountChange)
+    
+    return () => {
+      window.removeEventListener('accountChanged', handleAccountChange)
+    }
+  }, [])
 
   const fetchItems = useCallback(async () => {
     setIsLoading(true)
@@ -223,54 +245,321 @@ export default function ReviewQueue({ onOpenEmail }) {
       )}
 
       <div className="review-table-wrapper">
-        <table className="review-table">
-          <thead>
-            <tr>
-              <th>วันที่รับ</th>
-              <th>From</th>
-              <th>Subject</th>
-              <th>ไฟล์แนบ</th>
-              <th>OCR</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
-              <tr>
-                <td colSpan={5} className="review-empty">กำลังโหลด...</td>
-              </tr>
-            )}
-
-            {!isLoading && items.length === 0 && (
-              <tr>
-                <td colSpan={5} className="review-empty">ยังไม่มีข้อมูล</td>
-              </tr>
-            )}
-
-            {!isLoading &&
-              items.map((row) => (
-                <tr
-                  key={row.id}
-                  className="review-row"
-                  onClick={() => onOpenEmail && onOpenEmail(row.id)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') onOpenEmail && onOpenEmail(row.id)
-                  }}
-                >
-                  <td>{formatDate(row.receivedAt)}</td>
-                  <td className="review-cell-muted">{row.fromEmail}</td>
-                  <td className="review-cell-subject">{row.subject || '(no subject)'}</td>
-                  <td>{row.attachmentCount}</td>
-                  <td>
-                    {getOcrStatusBadge(row.ocrStatus)}
-                  </td>
+        {currentAccount && (
+          <div className="account-section">
+            <div className="account-header-row">
+              <h3 className="account-title">
+                📧 {currentAccount.name}
+              </h3>
+              <span className="account-email">({currentAccount.username})</span>
+              <span className="account-count">{items.length} ฉบับ</span>
+            </div>
+            
+            <table className="review-table">
+              <thead>
+                <tr>
+                  <th>วันที่รับ</th>
+                  <th>From</th>
+                  <th>Subject</th>
+                  <th>ไฟล์แนบ</th>
+                  <th>OCR</th>
                 </tr>
-              ))}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {isLoading && (
+                  <tr>
+                    <td colSpan={5} className="review-empty">กำลังโหลด...</td>
+                  </tr>
+                )}
+
+                {!isLoading && items.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="review-empty">ไม่มีอีเมลในบัญชีนี้</td>
+                  </tr>
+                )}
+
+                {!isLoading &&
+                  items.map((row) => (
+                    <tr
+                      key={row.id}
+                      className="review-row"
+                      onClick={() => onOpenEmail && onOpenEmail(row.id)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') onOpenEmail && onOpenEmail(row.id)
+                      }}
+                    >
+                      <td>{formatDate(row.receivedAt)}</td>
+                      <td className="review-cell-muted">{row.fromEmail}</td>
+                      <td className="review-cell-subject">{row.subject || '(no subject)'}</td>
+                      <td>{row.attachmentCount}</td>
+                      <td>
+                        {getOcrStatusBadge(row.ocrStatus)}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        
+        {!isLoading && !currentAccount && (
+          <div className="no-accounts">
+            <p>ไม่พบบัญชีที่เลือกใช้งาน</p>
+          </div>
+        )}
       </div>
       </section>
+      
+      <style jsx>{`
+        .review-section {
+          padding: 20px;
+        }
+
+        .review-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 20px;
+        }
+
+        .review-header h2 {
+          margin: 0;
+          color: #333;
+        }
+
+        .review-header p {
+          margin: 5px 0 0 0;
+          color: #666;
+        }
+
+        .review-header-actions {
+          display: flex;
+          gap: 10px;
+        }
+
+        .review-filters {
+          display: flex;
+          gap: 15px;
+          margin-bottom: 20px;
+          flex-wrap: wrap;
+        }
+
+        .review-filter {
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+        }
+
+        .review-filter label {
+          font-size: 14px;
+          font-weight: 500;
+          color: #333;
+        }
+
+        .review-filter input,
+        .review-filter select {
+          padding: 8px 12px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          font-size: 14px;
+        }
+
+        .review-table-wrapper {
+          overflow-x: auto;
+          margin-top: 20px;
+        }
+
+        .account-section {
+          margin-bottom: 30px;
+          border: 1px solid #e1e5e9;
+          border-radius: 8px;
+          overflow: hidden;
+        }
+
+        .account-header-row {
+          background: #f8f9fa;
+          padding: 12px 16px;
+          border-bottom: 1px solid #e1e5e9;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .account-title {
+          margin: 0;
+          font-size: 16px;
+          font-weight: 600;
+          color: #333;
+        }
+
+        .account-email {
+          color: #666;
+          font-size: 14px;
+        }
+
+        .account-count {
+          background: #007bff;
+          color: white;
+          padding: 2px 8px;
+          border-radius: 12px;
+          font-size: 12px;
+          font-weight: 500;
+          margin-left: auto;
+        }
+
+        .no-accounts {
+          text-align: center;
+          padding: 40px;
+          color: #666;
+        }
+
+        .review-table {
+          width: 100%;
+          border-collapse: collapse;
+          background: white;
+        }
+
+        .review-table th {
+          background: #f8f9fa;
+          padding: 12px 8px;
+          text-align: left;
+          font-weight: 600;
+          border-bottom: 1px solid #e1e5e9;
+          font-size: 14px;
+        }
+
+        .review-table td {
+          padding: 12px 8px;
+          border-bottom: 1px solid #f1f3f4;
+          font-size: 14px;
+        }
+
+        .review-row {
+          cursor: pointer;
+          transition: background-color 0.2s;
+        }
+
+        .review-row:hover {
+          background-color: #f8f9fa;
+        }
+
+        .review-cell-muted {
+          color: #666;
+        }
+
+        .review-cell-subject {
+          max-width: 300px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .review-empty {
+          text-align: center;
+          padding: 40px;
+          color: #666;
+          font-style: italic;
+        }
+
+        .error-message {
+          background: #f8d7da;
+          color: #721c24;
+          padding: 12px;
+          border-radius: 4px;
+          margin-bottom: 20px;
+        }
+
+        .ocr-result {
+          background: #d4edda;
+          color: #155724;
+          padding: 12px;
+          border-radius: 4px;
+          margin-bottom: 20px;
+        }
+
+        .ocr-result h4 {
+          margin: 0 0 10px 0;
+        }
+
+        .ocr-stats {
+          display: flex;
+          gap: 20px;
+          flex-wrap: wrap;
+        }
+
+        .badge {
+          padding: 4px 8px;
+          border-radius: 12px;
+          font-size: 12px;
+          font-weight: 500;
+        }
+
+        .badge-done {
+          background: #d4edda;
+          color: #155724;
+        }
+
+        .badge-partial {
+          background: #fff3cd;
+          color: #856404;
+        }
+
+        .badge-pending {
+          background: #f8d7da;
+          color: #721c24;
+        }
+
+        .badge-none {
+          background: #e2e3e5;
+          color: #6c757d;
+        }
+
+        .connection-status {
+          color: #28a745;
+          font-size: 12px;
+          margin: 5px 0 0 0;
+        }
+
+        .primary-button, .secondary-button {
+          padding: 10px 20px;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 14px;
+          text-decoration: none;
+          display: inline-block;
+        }
+
+        .primary-button {
+          background: #007bff;
+          color: white;
+        }
+
+        .primary-button:hover {
+          background: #0056b3;
+        }
+
+        .primary-button:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .secondary-button {
+          background: #6c757d;
+          color: white;
+        }
+
+        .secondary-button:hover {
+          background: #545b62;
+        }
+
+        .secondary-button:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+      `}</style>
     </>
   )
 }
