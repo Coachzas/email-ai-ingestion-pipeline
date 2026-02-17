@@ -75,7 +75,9 @@ export default function ReviewQueue({ onOpenEmail }) {
     setError(null)
 
     try {
-      const response = await fetch(`/api/review/emails?${queryString}`)
+      // Add timestamp to prevent caching
+      const cacheBuster = `&_t=${Date.now()}`
+      const response = await fetch(`/api/review/emails?${queryString}${cacheBuster}`)
       if (!response.ok) throw new Error('Failed to fetch review emails')
 
       const data = await response.json()
@@ -111,6 +113,31 @@ export default function ReviewQueue({ onOpenEmail }) {
   useEffect(() => {
     fetchItems()
   }, [fetchItems])
+
+  const handleDeleteEmail = async (emailId, event) => {
+    event.stopPropagation(); // Prevent row click
+    
+    if (!confirm('คุณแน่ใจหรือไม่ที่จะลบอีเมลนี้? การลบจะไม่สามารถกู้คืนได้')) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/review/emails/${emailId}`, {
+        method: 'DELETE'
+      })
+      
+      if (!response.ok) {
+        const err = await response.json()
+        throw new Error(err.message || 'Failed to delete email')
+      }
+      
+      // Clear cache and fetch fresh data
+      await fetchItems()
+      alert('✅ ลบอีเมลสำเร็จ')
+    } catch (err) {
+      setError(err.message)
+    }
+  }
 
   const getOcrStatusBadge = (status) => {
     const labels = {
@@ -240,18 +267,19 @@ export default function ReviewQueue({ onOpenEmail }) {
                   <th>Subject</th>
                   <th>ไฟล์แนบ</th>
                   <th>OCR</th>
+                  <th>จัดการ</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading && (
                   <tr>
-                    <td colSpan={5} className="review-empty">กำลังโหลด...</td>
+                    <td colSpan={6} className="review-empty">กำลังโหลด...</td>
                   </tr>
                 )}
 
                 {!isLoading && items.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="review-empty">ไม่มีอีเมลในบัญชีนี้</td>
+                    <td colSpan={6} className="review-empty">ไม่มีอีเมลในบัญชีนี้</td>
                   </tr>
                 )}
 
@@ -273,6 +301,15 @@ export default function ReviewQueue({ onOpenEmail }) {
                       <td>{row.attachmentCount}</td>
                       <td>
                         {getOcrStatusBadge(row.ocrStatus)}
+                      </td>
+                      <td onClick={(e) => e.stopPropagation()}>
+                        <button
+                          className="delete-button small"
+                          onClick={(e) => handleDeleteEmail(row.id, e)}
+                          title="ลบอีเมล"
+                        >
+                          🗑️ ลบ
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -517,6 +554,27 @@ export default function ReviewQueue({ onOpenEmail }) {
         .secondary-button:disabled {
           opacity: 0.6;
           cursor: not-allowed;
+        }
+
+        .delete-button {
+          padding: 6px 12px;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 12px;
+          text-decoration: none;
+          display: inline-block;
+          background: #dc3545;
+          color: white;
+        }
+
+        .delete-button:hover {
+          background: #c82333;
+        }
+
+        .delete-button.small {
+          padding: 4px 8px;
+          font-size: 11px;
         }
       `}</style>
     </>

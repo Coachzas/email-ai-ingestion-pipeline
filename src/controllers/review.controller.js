@@ -251,8 +251,110 @@ async function downloadAttachment(req, res) {
   }
 }
 
+const fs = require('fs');
+const fsPromises = require('fs').promises;
+const path = require('path');
+
+// Delete email and its attachments
+async function deleteEmail(req, res) {
+  try {
+    const { id } = req.params;
+    
+    console.log(`🗑️ Attempting to delete email: ${id}`);
+
+    // Check if email exists
+    const email = await prisma.email.findUnique({
+      where: { id },
+      include: {
+        attachments: true
+      }
+    });
+
+    console.log(`📧 Email query result:`, {
+      id: email?.id,
+      hasAttachments: !!email?.attachments,
+      attachmentsCount: email?.attachments?.length || 0,
+      attachments: email?.attachments || 'undefined'
+    });
+
+    if (!email) {
+      console.log(`❌ Email not found: ${id}`);
+      return res.status(404).json({
+        status: 'error',
+        message: 'Email not found'
+      });
+    }
+
+    console.log(`📧 Found email with ${email.attachments?.length || 0} attachments`);
+
+    // Delete attachments from file system first
+    if (email.attachments && email.attachments.length > 0) {
+      console.log(`🗑️ Deleting ${email.attachments.length} attachments from file system...`);
+      
+      const foldersToDelete = new Set();
+      
+      for (const attachment of email.attachments) {
+        try {
+          if (attachment.filePath && fs.existsSync(attachment.filePath)) {
+            await fsPromises.unlink(attachment.filePath);
+            console.log(`📁 Deleted file: ${attachment.fileName}`);
+            
+            // Track folder for cleanup
+            const folderPath = path.dirname(attachment.filePath);
+            if (folderPath && folderPath !== '.') {
+              foldersToDelete.add(folderPath);
+            }
+          }
+        } catch (fileError) {
+          console.error(`❌ Failed to delete file:`, fileError.message);
+        }
+      }
+      
+      // Clean up empty folders
+      for (const folderPath of foldersToDelete) {
+        try {
+          const files = await fsPromises.readdir(folderPath);
+          if (files.length === 0) {
+            await fsPromises.rmdir(folderPath);
+            console.log(`🗂️ Deleted folder: ${path.basename(folderPath)}`);
+          }
+        } catch (folderError) {
+          // Silently ignore folder deletion errors
+        }
+      }
+    }
+
+    // Delete attachments from database first to avoid foreign key constraint
+    if (email.attachments && email.attachments.length > 0) {
+      console.log(`🗑️ Deleting ${email.attachments.length} attachments from database...`);
+      await prisma.attachment.deleteMany({
+        where: { emailId: id }
+      });
+    }
+
+    // Delete email
+    await prisma.email.delete({
+      where: { id }
+    });
+
+    console.log(`✅ Email deleted successfully: ${id}`);
+    res.json({
+      status: 'success',
+      message: 'Email deleted successfully'
+    });
+  } catch (error) {
+    console.error('❌ Review deleteEmail error:', error);
+    console.error('❌ Full error stack:', error.stack);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to delete email: ' + error.message
+    });
+  }
+}
+
 module.exports = {
   listEmails,
   getEmailDetail,
-  downloadAttachment
+  downloadAttachment,
+  deleteEmail
 };
