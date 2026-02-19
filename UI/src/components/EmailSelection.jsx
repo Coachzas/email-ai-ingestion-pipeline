@@ -58,20 +58,43 @@ const EmailSelection = ({
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content email-selection-modal">
-        <div className="email-selection-header">
-          <h3>เลือกอีเมลที่ต้องการบันทึก</h3>
-          <p>แสดง {displayCount} จาก {emails.length} อีเมล (จำกัด: {displayLimitText})</p>
-        </div>
+      <div className="modal-content email-selection-modal" style={{
+        maxHeight: '90vh',
+        overflowY: 'auto'
+      }}>
         <div className="modal-header">
-          <button 
-            onClick={onClose} 
-            className="close-btn" 
-            aria-label="ปิด"
-            disabled={isLoading}
-          >
-            ×
-          </button>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            width: '100%'
+          }}>
+            <div></div>
+            <button 
+              onClick={onClose} 
+              className="close-btn" 
+              aria-label="ปิด"
+              disabled={isLoading}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                padding: '0',
+                lineHeight: '1'
+              }}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+        
+        <div className="email-selection-header" style={{ padding: '0 20px' }}>
+          <h3>เลือกอีเมลที่ต้องการบันทึก</h3>
+          <p>
+            แสดง {displayCount} จาก {emails.length} อีเมล<br/>
+            (จำกัด: {displayLimitText})
+          </p>
         </div>
 
         <div className="modal-body">

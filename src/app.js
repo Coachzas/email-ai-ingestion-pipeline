@@ -8,6 +8,7 @@ const reviewRoutes = require('./routes/review.routes');
 const ocrProgressRoutes = require('./routes/ocr-progress.routes');
 const emailProgressRoutes = require('./routes/email-progress.routes');
 const accountRoutes = require('./routes/account.routes');
+// Note: Removed legacy email.routes - not used in current system
 
 const path = require('path');
 

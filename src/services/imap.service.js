@@ -65,27 +65,6 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
                 console.log(`🔎 Using Thai date format for endDate: ${searchQuery.before} (was ${endDate}, +1 day to include end date)`);
             }
             console.log('🔎 Searching emails with Thai date range:', searchQuery);
-            
-            // ถ้าไม่เจออีเมล ลองค้นทั้งหมดเพื่อดูว่ามีอีเมลจริงหรือไม่
-            console.log('🔍 Testing: Searching ALL emails to check if any exist...');
-            const allUids = await client.search({ all: true });
-            console.log(`🔍 Total emails in INBOX: ${Array.isArray(allUids) ? allUids.length : 0}`);
-            
-            if (Array.isArray(allUids) && allUids.length > 0) {
-                // ดูอีเมล 5 ฉบับล่าสุดเพื่อดูวันที่
-                const recentUids = allUids.slice(-5);
-                console.log(`🔍 Recent UIDs: ${recentUids.join(', ')}`);
-                
-                for (const uid of recentUids) {
-                    try {
-                        const msg = await client.fetchOne(uid, { envelope: true });
-                        const emailDate = msg.envelope.date || new Date();
-                        console.log(`📧 UID ${uid}: ${emailDate.toLocaleString('th-TH')}`);
-                    } catch (err) {
-                        console.log(`❌ Error fetching UID ${uid}: ${err.message}`);
-                    }
-                }
-            }
         } else {
             searchQuery = { all: true };
         }
