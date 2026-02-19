@@ -11,8 +11,6 @@ export default function OcrProgressIndicator({
 }) {
   if (!isProcessing) return null
 
-  const progressPercentage = progress || (totalFiles > 0 ? (processed / totalFiles) * 100 : 0)
-
   return (
     <div className="ocr-progress-overlay">
       <div className="ocr-progress-modal">
@@ -30,14 +28,6 @@ export default function OcrProgressIndicator({
         </div>
         
         <div className="ocr-progress-body">
-          <div className="progress-bar-container">
-            <div 
-              className="progress-bar-fill" 
-              style={{ width: `${progressPercentage}%` }}
-            />
-            <span className="progress-text">{Math.round(progressPercentage)}%</span>
-          </div>
-          
           <div className="ocr-current-file">
             {currentFile && (
               <p>กำลังประมวลผล: <strong>{currentFile}</strong></p>
@@ -60,9 +50,6 @@ export default function OcrProgressIndicator({
           </div>
           
           <div className="ocr-time-estimate">
-            {processed > 0 && totalFiles > processed && (
-              <p>⏱️ ประมาณเวลาที่เหลือ: {estimateRemainingTime(processed, totalFiles)}</p>
-            )}
             <p className="ocr-note">📄 รองรับไฟล์ PDF, DOCX, XLSX, PPTX, CSV และรูปภาพ</p>
           </div>
         </div>
