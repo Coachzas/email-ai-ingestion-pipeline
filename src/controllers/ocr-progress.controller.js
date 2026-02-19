@@ -42,18 +42,28 @@ async function processAttachmentsWithProgress(limit = 30) {
     const message = args.join(' ');
     
     // Update current file from log
-    if (message.includes('Previewing UID:') || message.includes('Processing UID:')) {
-      const match = message.match(/UID:\s*(\d+)/);
+    if (message.includes('🔍 Extracting text from:') || 
+        message.includes('📷 Processing image file:') || 
+        message.includes('📄 Processing PDF file:') ||
+        message.includes('📊 Processing CSV file:') ||
+        message.includes('📝 Processing document file:')) {
+      const match = message.match(/Processing (.+?):|Extracting text from: (.+?) \(/);
       if (match) {
-        ocrProgress.currentFile = `UID ${match[1]}`;
+        const fileName = match[1] || match[2];
+        ocrProgress.currentFile = fileName;
         broadcastProgress(ocrProgress);
       }
     }
     
     // Update processed count
-    if (message.includes('✅ Saved:') || message.includes('📩 Email saved:')) {
-      ocrProgress.processed++;
-      broadcastProgress(ocrProgress);
+    if (message.includes('✅ Summary: Processed') || 
+        message.includes('✅ Summary:') ||
+        message.includes('📩 Email saved:')) {
+      const match = message.match(/Processed (\d+)\/(\d+)/);
+      if (match) {
+        ocrProgress.processed = parseInt(match[1]);
+        broadcastProgress(ocrProgress);
+      }
     }
     
     // Update error count
