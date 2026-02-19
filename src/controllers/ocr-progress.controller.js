@@ -57,8 +57,7 @@ async function processAttachmentsWithProgress(limit = 30) {
     
     // Update processed count
     if (message.includes('✅ Summary: Processed') || 
-        message.includes('✅ Summary:') ||
-        message.includes('📩 Email saved:')) {
+        message.includes('✅ Summary:')) {
       const match = message.match(/Processed (\d+)\/(\d+)/);
       if (match) {
         ocrProgress.processed = parseInt(match[1]);
@@ -71,6 +70,9 @@ async function processAttachmentsWithProgress(limit = 30) {
       ocrProgress.errors++;
       broadcastProgress(ocrProgress);
     }
+    
+    // Debug: Log all messages for troubleshooting
+    console.log(`[DEBUG] OCR Progress - Current: ${message}`);
   };
   
   console.error = (...args) => {
@@ -105,8 +107,9 @@ async function processAttachmentsWithProgress(limit = 30) {
     // Process attachments
     const result = await processAttachmentsOCR(limit);
     
-    // Final progress update
+    // Final progress update - MARK AS COMPLETED
     ocrProgress.isProcessing = false;
+    ocrProgress.currentFile = '✅ เสร็จสิ้น';
     broadcastProgress(ocrProgress);
     
     return result;
