@@ -93,67 +93,6 @@ async function fetchEmailsPreview(req, res) {
     }
 }
 
-async function getEmailSummary(req, res) {
-    try {
-        // Get the selected account
-        const account = await prisma.emailAccount.findFirst({
-            where: { 
-                  status: 'ACTIVE',
-                  isSelected: true 
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    host: true,
-                    port: true,
-                    secure: true,
-                    username: true,
-                    password: true,
-                    status: true
-                }
-            });
-
-        if (!account) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'No active email account found. Please configure an email account first.'
-            });
-        }
-
-        // Create account config for IMAP service
-        const accountConfig = {
-            id: account.id,
-            host: account.host,
-            port: account.port,
-            secure: account.secure,
-            auth: {
-                user: account.username,
-                pass: account.password,
-            }
-        };
-
-        // Get email summary from IMAP
-        const summary = await fetchEmails(null, null, true, accountConfig); // preview mode to get summary
-        
-        res.json({
-            status: 'success',
-            message: 'Email summary retrieved successfully',
-            summary: {
-                totalEmails: summary.length,
-                emailsWithAttachments: summary.filter(email => email.attachments && email.attachments.length > 0).length,
-                totalAttachments: summary.reduce((sum, email) => sum + (email.attachments?.length || 0), 0)
-            }
-        });
-    } catch (err) {
-        console.error('SUMMARY ERROR:', err);
-        res.status(500).json({
-            status: 'error',
-            message: 'Failed to get email summary',
-            error: err.message
-        });
-    }
-}
-
 async function saveSelectedEmails(req, res) {
     try {
         const { selectedEmails } = req.body || {};
