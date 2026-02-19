@@ -74,7 +74,7 @@ async function processAttachmentsOCR(limit = 30) {
         { extractedText: '' }
       ]
     },
-    take: limit,
+    take: typeof limit === 'number' ? limit : undefined,
   });
 
   console.log(`\n📋 OCR Processing: ${attachments.length} attachments\n`);

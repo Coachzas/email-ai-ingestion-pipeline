@@ -70,9 +70,6 @@ async function processAttachmentsWithProgress(limit = 30) {
       ocrProgress.errors++;
       broadcastProgress(ocrProgress);
     }
-    
-    // Debug: Log all messages for troubleshooting
-    console.log(`[DEBUG] OCR Progress - Current: ${message}`);
   };
   
   console.error = (...args) => {
@@ -95,7 +92,7 @@ async function processAttachmentsWithProgress(limit = 30) {
           { extractedText: '' }
         ]
       },
-      take: limit,
+      take: typeof limit === 'number' ? limit : undefined,
     });
 
     ocrProgress.totalFiles = attachments.length;
