@@ -114,7 +114,7 @@ export default function App() {
           <>
             <form className="controls" onSubmit={(e) => { e.preventDefault(); fetchEmailsPreview(); }}>
               <label>
-                เริ่มต้น
+                วันที่เริ่มต้น
                 <input 
                   type="date" 
                   value={startDate} 
@@ -125,7 +125,7 @@ export default function App() {
                 />
               </label>
               <label>
-                สิ้นสุด
+                วันที่สิ้นสุด
                 <input 
                   type="date" 
                   value={endDate} 

@@ -308,7 +308,7 @@ export default function ReviewQueue({ onOpenEmail }) {
 
         <div className="review-filter">
           <label>
-            OCR
+            ดึงข้อความจากไฟล์
             <select value={ocrStatus} onChange={(e) => setOcrStatus(e.target.value)}>
               <option value="">ทั้งหมด</option>
               <option value="done">เสร็จ</option>

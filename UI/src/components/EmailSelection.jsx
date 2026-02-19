@@ -40,13 +40,20 @@ const EmailSelection = ({
   }
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString('th-TH', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
+    if (!dateString) return 'ไม่ระบุวันที่';
+    
+    try {
+      return new Date(dateString).toLocaleString('th-TH', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.error('Invalid date:', dateString, error);
+      return 'วันที่ไม่ถูกต้อง';
+    }
   }
 
   return (
