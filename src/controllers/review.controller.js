@@ -255,13 +255,29 @@ const fs = require('fs');
 const fsPromises = require('fs').promises;
 const path = require('path');
 
-// Delete all emails and their attachments
+// Delete all emails and their attachments for the current user account
 async function deleteAllEmails(req, res) {
   try {
-    console.log('🗑️ Attempting to delete ALL emails...');
+    console.log('🗑️ Attempting to delete ALL emails for current account...');
     
-    // Get all emails with their attachments
+    // Get current account ID from request body
+    const accountId = req.body?.accountId || req.user?.id || req.account?.id || req.query?.accountId;
+    
+    if (!accountId) {
+      console.log('❌ No account ID found, cannot delete emails');
+      return res.status(400).json({
+        status: 'error',
+        message: 'Account ID required to delete emails'
+      });
+    }
+    
+    console.log(`📧 Deleting emails for account ID: ${accountId}`);
+    
+    // Get all emails for this account with their attachments
     const emails = await prisma.email.findMany({
+      where: {
+        accountId: accountId
+      },
       include: {
         attachments: true
       }
@@ -319,15 +335,25 @@ async function deleteAllEmails(req, res) {
       }
     }
 
-    // Delete all attachments from database
-    const attachmentsResult = await prisma.attachment.deleteMany({});
+    // Delete all attachments for this account from database
+    const attachmentsResult = await prisma.attachment.deleteMany({
+      where: {
+        email: {
+          accountId: accountId
+        }
+      }
+    });
     console.log(`🗑️ Deleted ${attachmentsResult.count} attachments from database`);
 
-    // Delete all emails from database
-    const emailsResult = await prisma.email.deleteMany({});
+    // Delete all emails for this account from database
+    const emailsResult = await prisma.email.deleteMany({
+      where: {
+        accountId: accountId
+      }
+    });
     console.log(`🗑️ Deleted ${emailsResult.count} emails from database`);
 
-    console.log(`✅ All emails deleted successfully: ${emailsResult.count} emails, ${deletedAttachmentsCount} files`);
+    console.log(`✅ All emails deleted successfully for account ${accountId}: ${emailsResult.count} emails, ${deletedAttachmentsCount} files`);
 
     res.json({
       status: 'success',
