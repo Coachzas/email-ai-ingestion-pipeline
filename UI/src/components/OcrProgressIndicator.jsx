@@ -2,7 +2,6 @@ import React from 'react'
 
 export default function OcrProgressIndicator({ 
   isProcessing, 
-  progress, 
   currentFile, 
   totalFiles, 
   processed, 
@@ -56,18 +55,4 @@ export default function OcrProgressIndicator({
       </div>
     </div>
   )
-}
-
-function estimateRemainingTime(processed, total) {
-  const remaining = total - processed
-  const avgTimePerFile = 2000 // 2 วินาทีต่อไฟล์ (ประมาณการ)
-  const remainingMs = remaining * avgTimePerFile
-  const remainingSeconds = Math.ceil(remainingMs / 1000)
-  
-  if (remainingSeconds < 60) {
-    return `~${remainingSeconds} วินาที`
-  } else {
-    const minutes = Math.ceil(remainingSeconds / 60)
-    return `~${minutes} นาที`
-  }
 }
