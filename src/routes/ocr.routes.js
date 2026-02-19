@@ -1,17 +1,36 @@
 const express = require('express');
 const router = express.Router();
-const { runOCR } = require('../controllers/ocr.controller');
-const { processAttachmentsOCR } = require('../services/attachment-ocr.service');
 const prisma = require('../utils/prisma');
 
-router.post('/attachments', runOCR);
+router.post('/attachments', (req, res) => {
+  // TO DO: implement /attachments endpoint
+  res.json({
+    status: 'success',
+    message: 'Attachments endpoint'
+  });
+});
 
 router.post('/process', async (req, res) => {
-  res.json({ status: 'started' });
-
-  processAttachmentsOCR(10)
-    .then(() => console.log('✅ OCR done'))
-    .catch(console.error);
+  try {
+    console.log('🔍 Starting OCR processing with progress tracking...');
+    
+    // Get limit from request body or default to 10
+    const { limit = 10 } = req.body || {};
+    
+    // Import the OCR progress controller function
+    const { startOcrWithProgress } = require('../controllers/ocr-progress.controller');
+    
+    // Start OCR with progress tracking
+    startOcrWithProgress(req, res, limit);
+    
+  } catch (error) {
+    console.error('❌ OCR process error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to start OCR processing',
+      error: error.message
+    });
+  }
 });
 
 // Get email summary statistics

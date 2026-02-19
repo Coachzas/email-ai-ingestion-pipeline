@@ -140,7 +140,7 @@ async function getOcrProgress(req, res) {
 }
 
 // Start OCR processing with progress tracking
-async function startOcrWithProgress(req, res) {
+async function startOcrWithProgress(req, res, limit = 30) {
   try {
     if (ocrProgress.isProcessing) {
       return res.status(400).json({
@@ -153,8 +153,8 @@ async function startOcrWithProgress(req, res) {
     ocrProgress.currentFile = 'กำลังเริ่มต้น...';
     broadcastProgress(ocrProgress);
 
-    // Start processing in background
-    processAttachmentsWithProgress(30)
+    // Start processing in background with custom limit
+    processAttachmentsWithProgress(limit)
       .then(result => {
         console.log('✅ OCR processing completed:', result);
         ocrProgress.isProcessing = false;
