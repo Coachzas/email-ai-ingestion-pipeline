@@ -211,6 +211,11 @@ export const useEmailPipeline = () => {
       
       // ดึงข้อมูลสรุปใหม่
       await fetchEmailSummary()
+      
+      // Refresh ReviewQueue page after successful save
+      if (typeof window !== 'undefined' && window.location) {
+        window.location.reload()
+      }
     } catch (err) {
       setState(prev => ({
         ...prev,
