@@ -38,15 +38,33 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
         if (startDate || endDate) {
             searchQuery = {};
             if (startDate) {
-                // Fix timezone issue: IMAP since cuts at 00:00 UTC, 
-                // so we go back 1 day as safety margin to catch Thai afternoon/evening emails
-                const safetyDate = new Date(startDate);
-                safetyDate.setDate(safetyDate.getDate() - 1);
-                searchQuery.since = safetyDate.toISOString().split('T')[0];
-                console.log(`🔎 Adjusted startDate from ${startDate} to ${searchQuery.since} (timezone safety margin)`);
+                const startThaiDate = new Date(startDate);
+                
+                // --- แก้ไขตรงนี้ ---
+                // ถอยหลังไป 1 วันสำหรับ IMAP Search เพื่อให้ครอบคลุมเวลาไทยที่เร็วกว่า UTC
+                const safetyDate = new Date(startThaiDate);
+                safetyDate.setDate(safetyDate.getDate() - 1); 
+                
+                const y = safetyDate.getFullYear();
+                const m = String(safetyDate.getMonth() + 1).padStart(2, '0');
+                const d = String(safetyDate.getDate()).padStart(2, '0');
+                searchQuery.since = `${y}-${m}-${d}`; 
+                // ------------------
+                
+                console.log(`🔎 IMAP Search Since: ${searchQuery.since} (Safety Margin for Zoho)`);
             }
-            if (endDate) searchQuery.before = endDate;
-            console.log('🔎 Searching emails with date range:', searchQuery);
+            if (endDate) {
+                // Use Thai date format for endDate, but add 1 day to include the end date
+                // IMAP 'before' means "before this date", so we need next day to include current day
+                const endThaiDate = new Date(endDate);
+                endThaiDate.setDate(endThaiDate.getDate() + 1); // Add 1 day
+                const y = endThaiDate.getFullYear();
+                const m = String(endThaiDate.getMonth() + 1).padStart(2, '0');
+                const d = String(endThaiDate.getDate()).padStart(2, '0');
+                searchQuery.before = `${y}-${m}-${d}`;
+                console.log(`🔎 Using Thai date format for endDate: ${searchQuery.before} (was ${endDate}, +1 day to include end date)`);
+            }
+            console.log('🔎 Searching emails with Thai date range:', searchQuery);
         } else {
             searchQuery = { all: true };
         }
@@ -79,13 +97,29 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
                 try {
                     console.log(`🔍 Previewing UID: ${uid}...`);
                     
-                    // ใช้ ImapFlow ดึง attachment content โดยตรง
                     const msg = await client.fetchOne(uid, { 
                         source: true,
                         bodyStructure: true,
                         envelope: true
                     });
                     const parsed = await simpleParser(msg.source);
+
+                    // --- เพิ่มส่วนตะแกรงร่อนตรงนี้ ---
+                    const receivedAt = parsed.date || new Date();
+                    if (startDate || endDate) {
+                        const startFilter = startDate ? new Date(startDate) : null;
+                        const endFilter = endDate ? new Date(endDate) : null;
+                        
+                        if (startFilter) startFilter.setHours(0, 0, 0, 0); // เที่ยงคืนไทย
+                        if (endFilter) endFilter.setHours(23, 59, 59, 999); // สิ้นวันไทย
+                        
+                        // ถ้าเมลอยู่นอกช่วงเวลาไทยที่ต้องการ ให้ข้ามไปเลย
+                        if ((startFilter && receivedAt < startFilter) || (endFilter && receivedAt > endFilter)) {
+                            console.log(`⏭️  Preview skipping UID ${uid} - date ${receivedAt.toLocaleString('th-TH')} outside Thai range`);
+                            continue; 
+                        }
+                    }
+                    // ------------------------------
 
                     // Debug attachments content
                     if (parsed.attachments && parsed.attachments.length > 0) {
@@ -99,7 +133,7 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
                         imapUid: uid,
                         from: parsed.from?.text || 'Unknown',
                         subject: parsed.subject || 'No Subject',
-                        date: parsed.date || new Date(),
+                        date: receivedAt, // ใช้ตัวแปรที่ผ่านการตรวจสอบแล้ว
                         text: parsed.text,
                         html: parsed.html,
                         attachments: parsed.attachments?.map(att => ({
@@ -110,9 +144,8 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
                             path: att.path
                         })) || []
                     });
-                    const attachmentCount = parsed.attachments?.length || 0;
-                    const totalContentSize = parsed.attachments?.reduce((sum, att) => sum + (att.content?.length || 0), 0) || 0;
-                    console.log(`📧 Previewed: ${parsed.subject || 'No Subject'} (${parsed.from?.text || 'Unknown'}) - ${attachmentCount} attachments (${totalContentSize} bytes)`);
+                    
+                    console.log(`✅ Previewed: ${parsed.subject || 'No Subject'} (${parsed.from?.text || 'Unknown'}) - Match Thai Timezone`);
                 } catch (msgErr) {
                     console.error(`❌ Failed to preview UID ${uid}:`, msgErr.message);
                 }
@@ -127,6 +160,23 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
                 console.log(`⏳ Processing UID: ${uid}...`);
                 const msg = await client.fetchOne(uid, { source: true });
                 const parsed = await simpleParser(msg.source); // simpleParser จะทำหน้าที่ ถอดรหัส ให้กลายเป็น Object ที่เราเรียกใช้งานง่ายๆ เช่น parsed.subject หรือ parsed.text
+
+                // ตรวจสอบวันที่ตามที่ผู้ใช้เลือก (กรองเพิ่มเติม)
+                const receivedAt = parsed.date || new Date();
+                if (startDate || endDate) {
+                    // สร้างวันที่เริ่มต้นและสิ้นสุดตาม timezone ไทย
+                    const startFilter = startDate ? new Date(startDate) : null;
+                    const endFilter = endDate ? new Date(endDate) : null;
+                    
+                    if (startFilter) startFilter.setHours(0, 0, 0, 0);
+                    if (endFilter) endFilter.setHours(23, 59, 59, 999);
+                    
+                    // กรองตามวันที่ที่ผู้ใช้เลือกโดยตรง
+                    if ((startFilter && receivedAt < startFilter) || (endFilter && receivedAt > endFilter)) {
+                        console.log(`⏭️  Skipping UID ${uid} - date ${receivedAt.toISOString()} outside range ${startFilter?.toISOString()} to ${endFilter?.toISOString()}`);
+                        continue;
+                    }
+                }
 
                 // เช็คก่อนว่า UID นี้เคยเก็บแล้วหรือยัง
                 const exists = await prisma.email.findUnique({

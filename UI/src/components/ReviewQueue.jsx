@@ -337,7 +337,7 @@ export default function ReviewQueue({ onOpenEmail }) {
                   <th>From</th>
                   <th>Subject</th>
                   <th>ไฟล์แนบ</th>
-                  <th>OCR</th>
+                  <th>ดึงข้อความจากไฟล์</th>
                   <th>จัดการ</th>
                 </tr>
               </thead>
