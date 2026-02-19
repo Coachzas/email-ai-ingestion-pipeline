@@ -70,6 +70,13 @@ async function processAttachmentsWithProgress(limit = 30) {
       ocrProgress.errors++;
       broadcastProgress(ocrProgress);
     }
+    
+    // Update processed count for successful extractions
+    if (message.includes('📊 Updated extracted text for') || 
+        message.includes('📊 Updated extracted text for')) {
+      ocrProgress.processed++;
+      broadcastProgress(ocrProgress);
+    }
   };
   
   console.error = (...args) => {
