@@ -456,7 +456,6 @@ async function processAttachmentsOCR(req, res) {
 
 module.exports = { 
     fetchEmailsPreview, 
-    getEmailSummary, 
     saveSelectedEmails, 
     processAttachmentsOCR 
 };

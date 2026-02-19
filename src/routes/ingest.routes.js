@@ -3,9 +3,8 @@ const express = require('express');
 const router = express.Router();
 
 // นำเข้าฟังก์ชันจากไฟล์ควบคุม ingest.controller.js
-const { getEmailSummary, fetchEmailsPreview, saveSelectedEmails, processAttachmentsOCR } = require('../controllers/ingest.controller');
+const { fetchEmailsPreview, saveSelectedEmails, processAttachmentsOCR } = require('../controllers/ingest.controller');
 
-router.get('/email-summary', getEmailSummary); //Path /email-summary: ดูสรุปข้อมูลอีเมล
 router.post('/fetch-emails-preview', fetchEmailsPreview); //Path /fetch-emails-preview: ดึงอีเมลมาดูก่อน (ไม่บันทึก) - รวมฟังก์ชัน runFetch
 router.post('/save-selected-emails', saveSelectedEmails); //Path /save-selected-emails: บันทึกอีเมลที่เลือก
 router.post('/process-ocr', processAttachmentsOCR); //Path /process-ocr: ทำ OCR processing สำหรับ attachments (ใช้ processAttachmentsOCRController)
