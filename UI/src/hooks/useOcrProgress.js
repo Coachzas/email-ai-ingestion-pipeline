@@ -35,6 +35,16 @@ export function useOcrProgress() {
             ...prev,
             ...data
           }))
+          
+          // Auto-refresh when OCR completes
+          if (data.isProcessing === false && prev.isProcessing === true) {
+            console.log('🔄 OCR completed, refreshing page...')
+            setTimeout(() => {
+              if (typeof window !== 'undefined' && window.location) {
+                window.location.reload()
+              }
+            }, 2000) // Wait 2 seconds to show completion message
+          }
         } catch (err) {
           console.error('❌ Failed to parse progress data:', err)
         }
