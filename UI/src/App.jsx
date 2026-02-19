@@ -146,13 +146,14 @@ export default function App() {
               <select 
                 value={displayLimit} 
                 onChange={(e) => setDisplayLimit(e.target.value)}
-                style={{ 
+                style={{
                   marginLeft: '8px', 
                   padding: '4px 8px', 
                   fontSize: '12px',
                   borderRadius: '4px',
-                  border: '1px solid #ccc',
-                  backgroundColor: '#f8f9fa'
+                  border: '1px solid #555',
+                  backgroundColor: '#222',
+                  color: '#fff'
                 }}
               >
                 <option value="all">แสดงทั้งหมด</option>
