@@ -211,6 +211,16 @@ export default function App() {
       </div>
 
       <style jsx>{`
+        body {
+          margin: 0;
+          padding: 0;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+            'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+            sans-serif;
+          background-color: #000;
+          color: #fff;
+        }
+        
         .fetch-email-container {
           display: flex;
           align-items: center;
@@ -218,11 +228,12 @@ export default function App() {
         }
 
         .fetch-email-container select {
-          border: 1px solid #ddd;
+          border: 1px solid #333;
           border-radius: 4px;
           padding: 6px 12px;
           font-size: 12px;
-          background: white;
+          background: #111;
+          color: #fff;
           cursor: pointer;
           transition: border-color 0.2s;
         }

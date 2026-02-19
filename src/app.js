@@ -17,7 +17,7 @@ app.use(express.static(path.join(__dirname, '../UI')));
 
 // middleware
 app.use(cors());
-app.use(express.json({ limit: '50mb' })); // เพิ่มจาก 20mb เป็น 50mb
+app.use(express.json({ limit: '50mb' })); 
 
 // IMAP routes
 app.use('/api/ingest', ingestRoutes);
