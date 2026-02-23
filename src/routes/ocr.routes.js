@@ -4,16 +4,14 @@ const prisma = require('../utils/prisma');
 
 router.post('/process', async (req, res) => {
   try {
-    console.log('🔍 Starting OCR processing with progress tracking...');
-    
     const { limit = 10 } = req.body || {};
     
     const { startOcrWithProgress } = require('../controllers/ocr-progress.controller');
     
+    // เริ่มกระบวนการ OCR พร้อมระบบติดตาม Progress
     startOcrWithProgress(req, res, limit);
     
   } catch (error) {
-    console.error('❌ OCR process error:', error);
     res.status(500).json({
       status: 'error',
       message: 'Failed to start OCR processing',
@@ -51,10 +49,10 @@ router.get('/summary', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Error fetching email summary:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Failed to fetch email summary'
+      message: 'Failed to fetch OCR summary',
+      error: error.message
     });
   }
 });

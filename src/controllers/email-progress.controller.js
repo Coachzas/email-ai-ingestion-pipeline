@@ -19,7 +19,6 @@ function broadcastProgress(progress) {
     try {
       client.write(data);
     } catch (err) {
-      console.error('❌ Failed to send email progress to client:', err);
       activeConnections.delete(client);
     }
   });
@@ -49,41 +48,32 @@ async function getEmailProgress(req, res) {
   activeConnections.add(res);
 
   // Handle client disconnect
-  req.on('close', () => {
-    activeConnections.delete(res);
-  });
-
   // Send heartbeat every 30 seconds
   const heartbeat = setInterval(() => {
-    if (activeConnections.has(res)) {
-      res.write(': heartbeat\n\n');
-    } else {
-      clearInterval(heartbeat);
-    }
+    res.write(': heartbeat\n\n');
   }, 30000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    activeConnections.delete(res);
+  });
 }
 
 // Start email processing with progress tracking
 async function startEmailProgress(totalEmails) {
-  try {
-    if (emailProgress.isProcessing) {
-      throw new Error('Email saving is already processing');
-    }
-
-    emailProgress.isProcessing = true;
-    emailProgress.currentEmail = 'กำลังเริ่มต้น...';
-    emailProgress.totalEmails = totalEmails;
-    emailProgress.processed = 0;
-    emailProgress.errors = 0;
-    emailProgress.startTime = Date.now();
-    broadcastProgress(emailProgress);
-
-    return emailProgress;
-  } catch (err) {
-    console.error('❌ Start email progress error:', err);
-    emailProgress.isProcessing = false;
-    throw err;
+  if (emailProgress.isProcessing) {
+    throw new Error('Email saving is already processing');
   }
+
+  emailProgress.isProcessing = true;
+  emailProgress.currentEmail = 'กำลังเริ่มต้น...';
+  emailProgress.totalEmails = totalEmails;
+  emailProgress.processed = 0;
+  emailProgress.errors = 0;
+  emailProgress.startTime = Date.now();
+  broadcastProgress(emailProgress);
+
+  return emailProgress;
 }
 
 // Complete email processing

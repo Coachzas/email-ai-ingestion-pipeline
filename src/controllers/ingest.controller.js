@@ -10,13 +10,10 @@ const {
   incrementErrors 
 } = require('./email-progress.controller');
 
-// ฟังก์ชันรวมสำหรับดึงอีเมล (preview mode) - รวม runFetch และ fetchEmailsPreview
 async function fetchEmailsPreview(req, res) {
     try {
         const { startDate, endDate } = req.body || {};
-        console.log('🔍 Fetching emails preview...', { startDate, endDate });
 
-        // Get the selected account
         const account = await prisma.emailAccount.findFirst({
             where: { 
               status: 'ACTIVE',
@@ -41,7 +38,6 @@ async function fetchEmailsPreview(req, res) {
             });
         }
 
-        // Create account config for IMAP service
         const accountConfig = {
             id: account.id,
             host: account.host,
@@ -53,20 +49,18 @@ async function fetchEmailsPreview(req, res) {
             }
         };
 
-        // ดึงอีเมลจาก IMAP แต่ยังไม่บันทึกลงฐานข้อมูล (preview mode)
-        const emails = await fetchEmails(startDate, endDate, true, accountConfig); // true = preview mode
-        console.log(`📧 Got ${emails.length} emails for preview`);
+        const emails = await fetchEmails(startDate, endDate, true, accountConfig);
         
         res.json({
             status: 'success',
             message: 'ดึงอีเมลตัวอย่างเสร็จแล้ว',
             emails: emails.map(email => ({
                 imapUid: email.imapUid,
-                tempId: `${email.imapUid}_${email.date?.getTime() || Date.now()}`, // เพิ่ม tempId สำหรับการเลือก
+                tempId: `${email.imapUid}_${email.date?.getTime() || Date.now()}`,
                 from: email.from,
                 subject: email.subject,
                 date: email.date,
-                receivedAt: email.date, // เพิ่ม receivedAt ให้ frontend ใช้
+                receivedAt: email.date,
                 text: email.text,
                 html: email.html,
                 attachmentCount: email.attachments?.length || 0,
@@ -82,7 +76,6 @@ async function fetchEmailsPreview(req, res) {
             endDate: endDate || null
         });
     } catch (err) {
-        console.error('PREVIEW ERROR:', err);
         res.status(500).json({
             status: 'error',
             message: 'Failed to fetch emails preview',
@@ -95,10 +88,6 @@ async function saveSelectedEmails(req, res) {
     try {
         const { selectedEmails } = req.body || {};
         
-        console.log(`💾 Saving selected emails...`);
-        console.log('📋 Request body:', JSON.stringify(req.body, null, 2));
-
-        // Get the selected account
         const account = await prisma.emailAccount.findFirst({
             where: { 
                   status: 'ACTIVE',
@@ -123,7 +112,6 @@ async function saveSelectedEmails(req, res) {
             });
         }
 
-        // Create account config for IMAP service
         const accountConfig = {
             id: account.id,
             host: account.host,
@@ -135,7 +123,6 @@ async function saveSelectedEmails(req, res) {
             }
         };
 
-        // รับทั้ง selectedEmails (full objects) หรือ selectedUids (array of numbers)
         let emailsToProcess = selectedEmails;
         
         if (!emailsToProcess || !Array.isArray(emailsToProcess)) {
@@ -145,32 +132,21 @@ async function saveSelectedEmails(req, res) {
             });
         }
 
-        console.log(`💾 Processing ${emailsToProcess.length} emails...`);
-
-        // Start progress tracking
         await startEmailProgress(emailsToProcess.length);
 
         const savedEmails = [];
         const skippedEmails = [];
-
         const attachmentStats = {
             total: 0,
             saved: 0,
             skipped: 0
         };
 
-        console.log(`📧 Processing ${emailsToProcess.length} selected emails for saving...`);
-
         const fs = require('fs');
         const path = require('path');
 
         for (const emailData of emailsToProcess) {
-            console.log(`\n🔍 Processing email: ${emailData.subject} (${emailData.imapUid})`);
-
-            // Update progress with current email
             updateCurrentEmail(emailData.subject || `UID ${emailData.imapUid}`);
-
-            console.log('📋 Email data:', JSON.stringify(emailData, null, 2));
 
             try {
                 const uid = Number(emailData.imapUid);
@@ -183,15 +159,11 @@ async function saveSelectedEmails(req, res) {
                     continue;
                 }
 
-                console.log(`🔍 Checking if UID ${uid} exists in database...`);
                 const existingEmail = await prisma.email.findUnique({
                     where: { imapUid: uid }
                 });
 
-                console.log('📋 Found existing email:', existingEmail);
-
                 if (existingEmail) {
-                    console.log(`⏭️  Skipping existing UID: ${uid} (already saved)`);
                     skippedEmails.push({
                         imapUid: uid,
                         reason: 'already exists'
@@ -199,11 +171,9 @@ async function saveSelectedEmails(req, res) {
                     continue;
                 }
 
-                // Fetch full email from IMAP
                 const fullEmail = await fetchEmailByUid(uid, accountConfig);
                 
                 if (!fullEmail) {
-                    console.log(`❌ Could not fetch email UID ${uid}`);
                     skippedEmails.push({
                         imapUid: uid,
                         reason: 'fetch failed'
@@ -212,7 +182,6 @@ async function saveSelectedEmails(req, res) {
                     continue;
                 }
 
-                // Save email to database
                 const savedEmail = await prisma.email.create({
                     data: {
                         imapUid: uid,
@@ -224,9 +193,6 @@ async function saveSelectedEmails(req, res) {
                     }
                 });
 
-                console.log(`💾 Saved email: ${savedEmail.subject}`);
-
-                // Process attachments if any
                 if (fullEmail.attachments && fullEmail.attachments.length > 0) {
                     const dir = path.join(__dirname, '../../storage', savedEmail.id);
                     fs.mkdirSync(dir, { recursive: true });
@@ -244,10 +210,8 @@ async function saveSelectedEmails(req, res) {
                                     filePath: filePath
                                 },
                             });
-                            console.log(`    ✅ Saved: ${attachment.filename}`);
                             attachmentStats.saved++;
                         } catch (fileErr) {
-                            console.error(`    ❌ Error saving file ${attachment.filename}:`, fileErr.message);
                             attachmentStats.skipped++;
                         }
                         attachmentStats.total++;
@@ -258,7 +222,6 @@ async function saveSelectedEmails(req, res) {
                 incrementProcessed();
 
             } catch (emailErr) {
-                console.error(`❌ Error processing UID ${emailData.imapUid}:`, emailErr.message);
                 skippedEmails.push({
                     imapUid: emailData.imapUid,
                     reason: emailErr.message
@@ -278,7 +241,6 @@ async function saveSelectedEmails(req, res) {
         });
 
     } catch (err) {
-        console.error('SAVE ERROR:', err);
         await completeEmailProgress();
         res.status(500).json({
             status: 'error',

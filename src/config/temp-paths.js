@@ -62,7 +62,11 @@ class TempPathManager {
         this.deleteDirectory(this.baseTempDir);
       }
     } catch (error) {
-      console.warn('⚠️ Cleanup error:', error.message);
+      if (error.code === 'EPERM') {
+        console.warn('⚠️ Permission denied during cleanup, continuing...');
+      } else {
+        console.warn('⚠️ Cleanup error:', error.message);
+      }
     }
   }
 

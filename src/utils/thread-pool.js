@@ -11,16 +11,8 @@ const ocrPool = new Piscina({
   concurrentTasksPerWorker: 1 // แต่ละ worker ทำงานได้ครั้งละ 1
 });
 
-/**
- * ส่งงานไปทำ OCR ใน Worker Thread
- * @param {string} filePath - พาธไฟล์ที่จะทำ OCR
- * @param {number} attachmentId - ID ของ attachment
- * @returns {Promise} - ผลลัพธ์จาก Worker
- */
 async function processWithWorker(filePath, attachmentId) {
-  console.log(`🏊 Sending to Worker Pool: ${filePath} (ID: ${attachmentId})`);
   const result = await ocrPool.run({ filePath, attachmentId });
-  console.log(`🏊 Worker Pool result:`, result);
   return result;
 }
 

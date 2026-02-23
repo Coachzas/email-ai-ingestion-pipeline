@@ -25,7 +25,6 @@ export function useOcrProgress() {
       eventSource.onopen = () => {
         setIsConnected(true)
         setError(null)
-        console.log('✅ Connected to OCR progress stream')
       }
 
       eventSource.onmessage = (event) => {
@@ -36,26 +35,22 @@ export function useOcrProgress() {
             ...data
           }))
           
-          // Auto-refresh when OCR completes
           if (data.isProcessing === false && prev.isProcessing === true) {
-            console.log('🔄 OCR completed, refreshing page...')
             setTimeout(() => {
               if (typeof window !== 'undefined' && window.location) {
                 window.location.reload()
               }
-            }, 2000) // Wait 2 seconds to show completion message
+            }, 2000)
           }
         } catch (err) {
-          console.error('❌ Failed to parse progress data:', err)
+          // Silently ignore parsing errors
         }
       }
 
       eventSource.onerror = (err) => {
-        console.error('❌ SSE connection error:', err)
         setIsConnected(false)
         setError('Connection lost')
         
-        // Auto-reconnect after 3 seconds
         setTimeout(() => {
           if (eventSource?.readyState === EventSource.CLOSED) {
             connect()
@@ -64,7 +59,6 @@ export function useOcrProgress() {
       }
 
     } catch (err) {
-      console.error('❌ Failed to connect to OCR progress:', err)
       setError('Failed to connect')
       setIsConnected(false)
     }
@@ -96,7 +90,6 @@ export function useOcrProgress() {
       return result
       
     } catch (err) {
-      console.error('❌ Failed to start OCR:', err)
       setError(err.message)
       throw err
     }

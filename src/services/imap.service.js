@@ -6,7 +6,6 @@ const prisma = require('../utils/prisma');
 
 //ฟังก์ชันสำหรับเชื่อมต่อและดึงข้อมูลอีเมล ผ่านไลบรารีที่ชื่อว่า Imapflow
 async function fetchEmails(startDate, endDate, previewMode = false, accountConfig = null) {
-    // Use provided account config or fall back to environment variables
     const config = accountConfig || {
         host: process.env.IMAP_HOST,
         port: process.env.IMAP_PORT,
@@ -22,7 +21,7 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
         port: config.port,
         secure: config.secure,
         auth: config.auth,
-        timeout: 30000, // 30 seconds timeout
+        timeout: 30000,
         connectionTimeout: 30000,
         authTimeout: 15000,
     });
@@ -31,85 +30,42 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
         // เชื่อมต่อกับเซิร์ฟเวอร์อีเมล และเปิดกล่องจดหมาย INBOX
         await client.connect();
         await client.mailboxOpen('INBOX');
-        console.log('✅ IMAP connected');
 
-        // Build search query - support optional date range with timezone fix
-        let searchQuery;
+        let searchQuery = { all: true };
         if (startDate || endDate) {
             searchQuery = {};
             if (startDate) {
                 const startThaiDate = new Date(startDate);
-                
-                // --- แก้ไขตรงนี้ ---
                 // ถอยหลังไป 1 วันสำหรับ IMAP Search เพื่อให้ครอบคลุมเวลาไทยที่เร็วกว่า UTC
                 const safetyDate = new Date(startThaiDate);
                 safetyDate.setDate(safetyDate.getDate() - 1); 
-                
                 const y = safetyDate.getFullYear();
                 const m = String(safetyDate.getMonth() + 1).padStart(2, '0');
                 const d = String(safetyDate.getDate()).padStart(2, '0');
                 searchQuery.since = `${y}-${m}-${d}`; 
-                // ------------------
-                
-                console.log(`🔎 IMAP Search Since: ${searchQuery.since} (Safety Margin for Zoho)`);
             }
             if (endDate) {
-                // Use Thai date format for endDate, but add 1 day to include the end date
-                // IMAP 'before' means "before this date", so we need next day to include current day
                 const endThaiDate = new Date(endDate);
-                endThaiDate.setDate(endThaiDate.getDate() + 1); // Add 1 day
+                endThaiDate.setDate(endThaiDate.getDate() + 1); 
                 const y = endThaiDate.getFullYear();
                 const m = String(endThaiDate.getMonth() + 1).padStart(2, '0');
                 const d = String(endThaiDate.getDate()).padStart(2, '0');
                 searchQuery.before = `${y}-${m}-${d}`;
-                console.log(`🔎 Using Thai date format for endDate: ${searchQuery.before} (was ${endDate}, +1 day to include end date)`);
             }
-            console.log('🔎 Searching emails with Thai date range:', searchQuery);
-        } else {
-            searchQuery = { all: true };
         }
 
         // ดึง UID ของอีเมลตามเงื่อนไข
         const uids = await client.search(searchQuery);
-        console.log(`🔍 Search query:`, searchQuery);
-        console.log(`🔍 Total UIDs found: ${Array.isArray(uids) ? uids.length : (uids ? Object.keys(uids).length : 0)}`);
-        
-        // ตรวจสอบและแปลงให้เป็น array
-        let uidArray = [];
-        if (Array.isArray(uids)) {
-            uidArray = uids;
-        } else if (uids && typeof uids === 'object') {
-            uidArray = Object.values(uids);
-        } else if (uids) {
-            uidArray = [uids];
-        }
-        
-        console.log(`📊 UID array length: ${uidArray.length}`);
-        
-        // Debug: แสดง UIDs 5 อันแรก
-        if (uidArray.length > 0) {
-            console.log(`🔍 First 5 UIDs:`, uidArray.slice(0, 5));
-        } else {
-            console.log(`⚠️ No UIDs found! Check search query:`, searchQuery);
-        }
+        let uidArray = Array.isArray(uids) ? uids : (uids && typeof uids === 'object' ? Object.values(uids) : (uids ? [uids] : []));
         
         const lastUids = uidArray.slice(-100); // จำกัด 100 อันล่าสุด
-        console.log(`📧 Processing ${lastUids.length} UIDs (limited to 100)`);
-        console.log(`📊 UID range: ${lastUids.length > 0 ? `${lastUids[0]} - ${lastUids[lastUids.length - 1]}` : 'No UIDs'}`);
 
         // ถ้าเป็น preview mode ให้คืนค่าอีเมลโดยไม่บันทึก
         if (previewMode) {
             const previewEmails = [];
-            
             for (const uid of lastUids) {
                 try {
-                    console.log(`🔍 Previewing UID: ${uid}...`);
-                    
-                    const msg = await client.fetchOne(uid, { 
-                        source: true,
-                        bodyStructure: true,
-                        envelope: true
-                    });
+                    const msg = await client.fetchOne(uid, { source: true, bodyStructure: true, envelope: true });
                     const parsed = await simpleParser(msg.source);
 
                     // --- เพิ่มส่วนตะแกรงร่อนตรงนี้ ---
@@ -117,86 +73,53 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
                     if (startDate || endDate) {
                         const startFilter = startDate ? new Date(startDate) : null;
                         const endFilter = endDate ? new Date(endDate) : null;
+                        if (startFilter) startFilter.setHours(0, 0, 0, 0); 
+                        if (endFilter) endFilter.setHours(23, 59, 59, 999); 
                         
-                        if (startFilter) startFilter.setHours(0, 0, 0, 0); // เที่ยงคืนไทย
-                        if (endFilter) endFilter.setHours(23, 59, 59, 999); // สิ้นวันไทย
-                        
-                        // ถ้าเมลอยู่นอกช่วงเวลาไทยที่ต้องการ ให้ข้ามไปเลย
-                        if ((startFilter && receivedAt < startFilter) || (endFilter && receivedAt > endFilter)) {
-                            console.log(`⏭️  Preview skipping UID ${uid} - date ${receivedAt.toLocaleString('th-TH')} outside Thai range`);
-                            continue; 
-                        }
-                    }
-                    // ------------------------------
-
-                    // Debug attachments content
-                    if (parsed.attachments && parsed.attachments.length > 0) {
-                        console.log(`📎 UID ${uid} has ${parsed.attachments.length} attachments:`);
-                        parsed.attachments.forEach((att, index) => {
-                            console.log(`  ${index + 1}. ${att.filename} - Content length: ${att.content ? att.content.length : 0} bytes`);
-                        });
+                        if ((startFilter && receivedAt < startFilter) || (endFilter && receivedAt > endFilter)) continue; 
                     }
 
                     previewEmails.push({
                         imapUid: uid,
                         from: parsed.from?.text || 'Unknown',
                         subject: parsed.subject || 'No Subject',
-                        date: receivedAt, // ใช้ตัวแปรที่ผ่านการตรวจสอบแล้ว
+                        date: receivedAt,
                         text: parsed.text,
                         html: parsed.html,
                         attachments: parsed.attachments?.map(att => ({
                             filename: att.filename,
                             contentType: att.contentType,
                             size: att.size,
-                            content: att.content, // เก็บ content จริง
+                            content: att.content,
                             path: att.path
                         })) || []
                     });
-                    
-                    console.log(`✅ Previewed: ${parsed.subject || 'No Subject'} (${parsed.from?.text || 'Unknown'}) - Match Thai Timezone`);
-                } catch (msgErr) {
-                    console.error(`❌ Failed to preview UID ${uid}:`, msgErr.message);
-                }
+                } catch (msgErr) { }
             }
-            
             return previewEmails;
         }
 
         // ดึงอีเมลทีละฉบับตาม UID ที่ได้มา (normal mode)
         for (const uid of lastUids) {
             try {
-                console.log(`⏳ Processing UID: ${uid}...`);
                 const msg = await client.fetchOne(uid, { source: true });
-                const parsed = await simpleParser(msg.source); // simpleParser จะทำหน้าที่ ถอดรหัส ให้กลายเป็น Object ที่เราเรียกใช้งานง่ายๆ เช่น parsed.subject หรือ parsed.text
+                const parsed = await simpleParser(msg.source); // simpleParser จะทำหน้าที่ ถอดรหัส ให้กลายเป็น Object
 
                 // ตรวจสอบวันที่ตามที่ผู้ใช้เลือก (กรองเพิ่มเติม)
                 const receivedAt = parsed.date || new Date();
                 if (startDate || endDate) {
-                    // สร้างวันที่เริ่มต้นและสิ้นสุดตาม timezone ไทย
                     const startFilter = startDate ? new Date(startDate) : null;
                     const endFilter = endDate ? new Date(endDate) : null;
-                    
                     if (startFilter) startFilter.setHours(0, 0, 0, 0);
                     if (endFilter) endFilter.setHours(23, 59, 59, 999);
-                    
-                    // กรองตามวันที่ที่ผู้ใช้เลือกโดยตรง
-                    if ((startFilter && receivedAt < startFilter) || (endFilter && receivedAt > endFilter)) {
-                        console.log(`⏭️  Skipping UID ${uid} - date ${receivedAt.toISOString()} outside range ${startFilter?.toISOString()} to ${endFilter?.toISOString()}`);
-                        continue;
-                    }
+                    if ((startFilter && receivedAt < startFilter) || (endFilter && receivedAt > endFilter)) continue;
                 }
 
                 // เช็คก่อนว่า UID นี้เคยเก็บแล้วหรือยัง
-                const exists = await prisma.email.findUnique({
-                    where: { imapUid: uid },
-                });
+                const exists = await prisma.email.findUnique({ where: { imapUid: uid } });
+                if (exists) continue;
 
-                if (exists) {
-                    console.log(`⏭️  Skipping existing UID: ${uid}`);
-                    continue;
-                }
-
-                const email = await prisma.email.create({ // prisma.email.create: สั่งให้ ORM (Prisma) นำข้อมูลที่เราแกะได้ไป Insert ลงในตาราง email ใน Database
+                const email = await prisma.email.create({ // นำข้อมูลไป Insert ลงในตาราง email
                     data: {
                         imapUid: uid,
                         fromEmail: parsed.from?.text || '',
@@ -204,113 +127,63 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
                         bodyText: parsed.text || '',
                         receivedAt: parsed.date || new Date(),
                         accountId: accountConfig?.id || null
-                    }, // การใช้ || '' หรือ || new Date(): เป็นการป้องกัน Error (Fallback) ในกรณีที่อีเมลฉบับนั้นไม่มีหัวข้อ หรือไม่มีวันที่ส่งมา
+                    },
                 });
 
                 // มี attachments?
                 if (parsed.attachments?.length) {
-                    console.log(`  📎 Found ${parsed.attachments.length} attachments in "${parsed.subject}"`);
-                    //การกำหนดเส้นทางจัดเก็บ (path.join)
                     const dir = path.join(__dirname, '../../storage', email.id);
-                    //recursive: true: ถ้าโฟลเดอร์ตามเส้นทางที่ระบุ (เช่น storage/) ยังไม่มีอยู่ ให้สร้างขึ้นมาให้ครบทุกลำดับชั้นโดยอัตโนมัติ รวมถึงจะไม่แจ้ง Error หากโฟลเดอร์นั้นมีอยู่แล้ว
                     fs.mkdirSync(dir, { recursive: true });
 
-                    // บันทึกไฟล์จริงลงใน Disk และ สร้างประวัติไฟล์แนบในฐานข้อมูล
-                    // เข้าไปดูใน parsed.attachments (ซึ่งได้มาจาก simpleParser) ว่าอีเมลฉบับนี้มีไฟล์แนบกี่ไฟล์ และหยิบมาจัดการทีละไฟล์จนครบ
                     for (const file of parsed.attachments) {
                         try {
-                            // รวมร่างระหว่าง "ที่อยู่โฟลเดอร์" (dir) และ "ชื่อไฟล์" (file.filename) เพื่อให้ได้เส้นทางเต็มของไฟล์ที่จะบันทึกลง Disk
                             const filePath = path.join(dir, file.filename);
-                            //fs.writeFileSync: นำข้อมูลดิบของไฟล์ (file.content) เขียนลงไปใน Disk ทันทีตามเส้นทางที่กำหนดไว้
-                            fs.writeFileSync(filePath, file.content);
+                            fs.writeFileSync(filePath, file.content); // บันทึกไฟล์จริงลงใน Disk
 
-                            // เป็นการสร้าง Foreign Key (emailId) เพื่อเชื่อมไฟล์แนบเข้ากับตัวอีเมลหลัก ทำให้เวลาอยากดูว่า "อีเมลฉบับนี้มีไฟล์อะไรบ้าง" สามารถ Query หาจาก emailId ได้ทันที
-                            await prisma.attachment.create({
+                            await prisma.attachment.create({ // สร้างประวัติไฟล์แนบในฐานข้อมูล
                                 data: {
-                                    emailId: email.id, // เชื่อมโยงว่าไฟล์นี้เป็นของอีเมลฉบับไหน
+                                    emailId: email.id,
                                     fileName: file.filename,
-                                    fileType: file.contentType, // ประเภทไฟล์ เช่น image/jpeg, application/pdf
-                                    filePath, // เก็บที่อยู่ไฟล์ไว้สำหรับเรียกใช้งานภายหลัง
+                                    fileType: file.contentType,
+                                    filePath,
                                 },
                             });
-                            console.log(`    ✅ Saved: ${file.filename}`);
-                        } catch (fileErr) {
-                            console.error(`    ❌ Error saving file ${file.filename}:`, fileErr.message);
-                        }
+                        } catch (fileErr) { }
                     }
                 }
-                console.log(`📩 Email saved: ${parsed.subject}`);
-            } catch (emailErr) {
-                console.error(`❌ Error processing UID ${uid}:`, emailErr.message);
-            }
+            } catch (emailErr) { }
         }
-        await client.logout(); //บอกให้ Email Server ทราบว่าเราทำงานเสร็จแล้วนะ ให้ปิด Session นี้ได้เลย
-        console.log('✅ IMAP fetch completed');
+        await client.logout(); // ปิด Session
         
-        // Return list of fetched emails for controller to reference
         const dateFilter = {};
-        if (startDate) {
-            const start = new Date(startDate);
-            start.setHours(0, 0, 0, 0); // Start of day in local timezone
-            dateFilter.gte = start;
-        }
-        if (endDate) {
-            const end = new Date(endDate);
-            end.setHours(23, 59, 59, 999); // End of day in local timezone
-            dateFilter.lte = end;
-        }
+        if (startDate) { dateFilter.gte = new Date(startDate); dateFilter.gte.setHours(0,0,0,0); }
+        if (endDate) { dateFilter.lte = new Date(endDate); dateFilter.lte.setHours(23,59,59,999); }
 
-        const fetchedEmailIds = await prisma.email.findMany({
-            where: {
-                receivedAt: Object.keys(dateFilter).length > 0 ? dateFilter : undefined
-            },
+        return await prisma.email.findMany({
+            where: { receivedAt: Object.keys(dateFilter).length > 0 ? dateFilter : undefined },
             select: { id: true }
         });
-        
-        return fetchedEmailIds;
     } catch (err) {
-        console.error('❌ IMAP Error:', err.message);
         throw err;
     }
 }
 
 async function fetchEmailByUid(uid, accountConfig = null) {
-    // Use provided account config or fall back to environment variables
     const config = accountConfig || {
         host: process.env.IMAP_HOST,
         port: process.env.IMAP_PORT,
         secure: true,
-        auth: {
-            user: process.env.IMAP_USER,
-            pass: process.env.IMAP_PASS,
-        }
+        auth: { user: process.env.IMAP_USER, pass: process.env.IMAP_PASS }
     };
-
-    const client = new ImapFlow({
-        host: config.host,
-        port: config.port,
-        secure: config.secure,
-        auth: config.auth,
-    });
-
+    const client = new ImapFlow({ host: config.host, port: config.port, secure: config.secure, auth: config.auth });
     try {
         await client.connect();
         await client.mailboxOpen('INBOX');
-
-        const msg = await client.fetchOne(uid, {
-            source: true,
-            bodyStructure: true,
-            envelope: true
-        });
-
-        const parsed = await simpleParser(msg.source);
-        return parsed;
+        const msg = await client.fetchOne(uid, { source: true, bodyStructure: true, envelope: true });
+        return await simpleParser(msg.source);
     } finally {
-        try {
-            await client.logout();
-        } catch (e) {
-        }
+        try { await client.logout(); } catch (e) { }
     }
 }
 
-module.exports = { fetchEmails, fetchEmailByUid }; // ส่งออกฟังก์ชัน fetchEmails เพื่อให้ไฟล์อื่นๆ สามารถเรียกใช้งานได้
+module.exports = { fetchEmails, fetchEmailByUid };

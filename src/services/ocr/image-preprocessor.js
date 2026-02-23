@@ -74,7 +74,6 @@ class ImagePreprocessor {
       return outputPath;
 
     } catch (error) {
-      console.error(`❌ Preprocessing failed: ${error.message}`);
       return inputPath;
     }
   }
@@ -94,7 +93,6 @@ class ImagePreprocessor {
       return fs.readFileSync(processedPath);
 
     } catch (error) {
-      console.error(`❌ Buffer preprocessing failed: ${error.message}`);
       return imageBuffer;
     }
   }
@@ -182,7 +180,6 @@ class ImagePreprocessor {
       };
 
     } catch (error) {
-      console.error(`❌ Multi-method preprocessing failed: ${error.message}`);
       return { method1: inputPath, method2: inputPath, method3: inputPath };
     }
   }

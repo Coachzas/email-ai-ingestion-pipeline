@@ -38,21 +38,18 @@ export const useEmailPipeline = () => {
             emailProgress: {
               ...prev.emailProgress,
               ...progressData,
-              // Calculate progress percentage
               progress: progressData.totalEmails > 0 
                 ? Math.round((progressData.processed / progressData.totalEmails) * 100)
                 : 0
             }
           }))
         } catch (err) {
-          console.error('Error parsing email progress data:', err)
+          // Silently ignore parsing errors
         }
       }
 
       eventSource.onerror = (err) => {
-        console.error('Email progress SSE error:', err)
         eventSource?.close()
-        // Reconnect after 3 seconds
         setTimeout(connectEmailProgress, 3000)
       }
     }
@@ -125,7 +122,7 @@ export const useEmailPipeline = () => {
       const data = await response.json()
       setEmailSummary(data.summary)
     } catch (err) {
-      console.error('Error fetching email summary:', err)
+      // Silently ignore summary fetch errors
     }
   }, [])
 
@@ -133,12 +130,10 @@ export const useEmailPipeline = () => {
     setState(prev => ({ ...prev, isLoading: true, error: null, log: 'กำลังเชื่อมต่อ IMAP...\n' }))
     
     try {
-      // Adjust dates for proper timezone handling
       let adjustedStartDate = state.startDate;
       let adjustedEndDate = state.endDate;
       
       if (state.startDate && state.endDate && state.startDate === state.endDate) {
-        // When same date, add time range to include entire day
         adjustedEndDate = `${state.endDate}T23:59:59.999+07:00`;
       }
       
@@ -182,9 +177,6 @@ export const useEmailPipeline = () => {
     setState(prev => ({ ...prev, isLoading: true, log: 'กำลังบันทึกอีเมลที่เลือก...\n' }))
     
     try {
-      // Debug: ตรวจสอบข้อมูลที่ส่ง
-      console.log('🔍 Selected emails to save:', selectedEmails);
-      
       const response = await fetch('/api/ingest/save-selected-emails', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -209,10 +201,8 @@ export const useEmailPipeline = () => {
             `📎 บันทึกไฟล์แนบ ${data.attachmentSavedCount || 0} ไฟล์ (ข้าม ${data.attachmentSkippedCount || 0} ไฟล์)\n`
       }))
       
-      // ดึงข้อมูลสรุปใหม่
       await fetchEmailSummary()
       
-      // Refresh ReviewQueue page after successful save
       if (typeof window !== 'undefined' && window.location) {
         window.location.reload()
       }
