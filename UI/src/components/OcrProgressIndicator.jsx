@@ -43,7 +43,7 @@ export default function OcrProgressIndicator({
               <span className="stat-value processed">{processed}</span>
             </div>
             <div className="stat-item">
-              <span className="stat-label">ข้อผิดพลาด:</span>
+              <span className="stat-label">ไม่สามารถดึงข้อความ:</span>
               <span className="stat-value errors">{errors}</span>
             </div>
           </div>

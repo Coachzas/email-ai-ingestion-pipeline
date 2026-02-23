@@ -1,7 +1,5 @@
 const { fetchEmails, fetchEmailByUid } = require('../services/imap.service');
 
-const { processAttachmentsOCR: processAttachmentsOCRService } = require('../services/attachment-ocr.service');
-
 const prisma = require('../utils/prisma');
 
 const { 
@@ -290,111 +288,7 @@ async function saveSelectedEmails(req, res) {
     }
 }
 
-async function processAttachmentsOCR(req, res) {
-    try {
-        const { emailIds } = req.body || {};
-        
-        if (!Array.isArray(emailIds) || emailIds.length === 0) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'emailIds must be a non-empty array'
-            });
-        }
-
-        console.log(`🔍 Processing OCR for ${emailIds.length} emails...`);
-
-        const results = [];
-        
-        for (const emailId of emailIds) {
-            try {
-                const email = await prisma.email.findUnique({
-                    where: { id: emailId },
-                    include: { attachments: true }
-                });
-
-                if (!email) {
-                    results.push({
-                        emailId,
-                        status: 'error',
-                        message: 'Email not found'
-                    });
-                    continue;
-                }
-
-                if (!email.attachments || email.attachments.length === 0) {
-                    results.push({
-                        emailId,
-                        status: 'skipped',
-                        message: 'No attachments'
-                    });
-                    continue;
-                }
-
-                // Process OCR for each attachment
-                const attachmentResults = [];
-                for (const attachment of email.attachments) {
-                    try {
-                        const ocrResult = await processAttachmentsOCRService(attachment.filePath);
-                        
-                        // Update attachment with OCR result
-                        await prisma.attachment.update({
-                            where: { id: attachment.id },
-                            data: { extractedText: ocrResult.text }
-                        });
-
-                        attachmentResults.push({
-                            attachmentId: attachment.id,
-                            fileName: attachment.fileName,
-                            status: 'success',
-                            extractedText: ocrResult.text
-                        });
-
-                    } catch (ocrErr) {
-                        console.error(`❌ OCR error for attachment ${attachment.fileName}:`, ocrErr.message);
-                        attachmentResults.push({
-                            attachmentId: attachment.id,
-                            fileName: attachment.fileName,
-                            status: 'error',
-                            error: ocrErr.message
-                        });
-                    }
-                }
-
-                results.push({
-                    emailId,
-                    subject: email.subject,
-                    status: 'success',
-                    attachments: attachmentResults
-                });
-
-            } catch (emailErr) {
-                console.error(`❌ Error processing OCR for email ${emailId}:`, emailErr.message);
-                results.push({
-                    emailId,
-                    status: 'error',
-                    message: emailErr.message
-                });
-            }
-        }
-
-        res.json({
-            status: 'success',
-            message: 'OCR processing completed',
-            results: results
-        });
-
-    } catch (err) {
-        console.error('OCR ERROR:', err);
-        res.status(500).json({
-            status: 'error',
-            message: 'Failed to process OCR',
-            error: err.message
-        });
-    }
-}
-
 module.exports = { 
     fetchEmailsPreview, 
-    saveSelectedEmails, 
-    processAttachmentsOCR 
+    saveSelectedEmails
 };

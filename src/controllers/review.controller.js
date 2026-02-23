@@ -223,7 +223,7 @@ async function downloadAttachment(req, res) {
     const fs = require('fs');
     const path = require('path');
 
-    const filePath = path.join(__dirname, '../../', attachment.filePath);
+    const filePath = attachment.filePath; // ใช้ path ที่เก็บไว้ในฐานข้อมูลโดยตรง
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({
         status: 'error',
@@ -260,8 +260,8 @@ async function deleteAllEmails(req, res) {
   try {
     console.log('🗑️ Attempting to delete ALL emails for current account...');
     
-    // Get current account ID from request body
-    const accountId = req.body?.accountId || req.user?.id || req.account?.id || req.query?.accountId;
+    // Get current account ID from request (assuming it's passed in req.user or req.account)
+    const accountId = req.user?.id || req.account?.id || req.body?.accountId || req.query?.accountId;
     
     if (!accountId) {
       console.log('❌ No account ID found, cannot delete emails');

@@ -3,6 +3,161 @@ const { runOCR } = require('./ocr/ocr.service');
 const prisma = require('../utils/prisma');
 
 /**
+ * ทำความสะอาดข้อความสำหรับ database
+ */
+function sanitizeText(text) {
+  if (!text) return '';
+  
+  return text
+    // ลบ null bytes และ control characters
+    .replace(/\x00/g, '')
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    // แปลง newline ให้เป็นมาตรฐาน
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    // ลบช่องว่างซ้ำ
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
+}
+
+/**
+ * PURE FUNCTION: ดึงข้อความจากไฟล์โดยไม่มี side effects
+ * รับแค่ filePath และคืนข้อความเท่านั้น
+ */
+async function extractTextFromPath(filePath) {
+  const fs = require('fs');
+  const path = require('path');
+  
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`File not found: ${filePath}`);
+  }
+
+  const ext = path.extname(filePath).toLowerCase();
+  console.log(`🔍 Pure function extracting from: ${path.basename(filePath)} (${ext})`);
+  
+  switch (ext) {
+    case '.jpg':
+    case '.jpeg':
+    case '.png':
+    case '.bmp':
+    case '.tiff':
+    case '.gif':
+      console.log(`🔍 Using OCR for image: ${path.basename(filePath)}`);
+      try {
+        // ตรวจสอบว่าไฟล์มีอยู่จริง
+        if (!fs.existsSync(filePath)) {
+          console.warn(`⚠️ Image file not found: ${filePath}`);
+          return '';
+        }
+        
+        console.log(`🔍 Image file exists, size: ${fs.statSync(filePath).size} bytes`);
+        const ocrResult = await runOCR(filePath);
+        console.log(`🔍 OCR raw result type:`, typeof ocrResult);
+        console.log(`🔍 OCR raw result:`, ocrResult);
+        
+        // OCR Service ส่งค่ากลับเป็น string ตรงๆ
+        const ocrText = sanitizeText(ocrResult || '');
+        console.log(`🔍 OCR result: ${ocrText.length} chars`);
+        return ocrText;
+      } catch (ocrErr) {
+        console.warn(`⚠️ OCR failed for image: ${ocrErr.message}`);
+        return '';
+      }
+      
+    case '.pdf':
+      console.log(`🔍 Using PDF extractor for: ${path.basename(filePath)}`);
+      const pdfResult = await extractors.pdf(filePath);
+      console.log(`🔍 PDF extractor raw result:`, pdfResult);
+      console.log(`🔍 PDF extractor result type:`, typeof pdfResult);
+      console.log(`🔍 PDF extractor result length:`, pdfResult ? pdfResult.length : 'undefined/null');
+      
+      const pdfText = sanitizeText(pdfResult || '');
+      console.log(`🔍 PDF result after sanitize: ${pdfText.length} chars`);
+      return pdfText;
+      
+    case '.csv':
+      console.log(`🔍 Using CSV extractor for: ${path.basename(filePath)}`);
+      try {
+        if (!fs.existsSync(filePath)) {
+          console.warn(`⚠️ CSV file not found: ${filePath}`);
+          return '';
+        }
+        
+        console.log(`🔍 CSV file exists, size: ${fs.statSync(filePath).size} bytes`);
+        const csvResult = await extractors.csv(filePath);
+        console.log(`🔍 CSV raw result type:`, typeof csvResult);
+        console.log(`🔍 CSV raw result:`, csvResult);
+        
+        // CSV extractor ส่งค่ากลับเป็น string ตรงๆ
+        const csvText = sanitizeText(csvResult || '');
+        console.log(`🔍 CSV result: ${csvText.length} chars`);
+        return csvText;
+      } catch (csvErr) {
+        console.warn(`⚠️ CSV extraction failed: ${csvErr.message}`);
+        return '';
+      }
+      
+    case '.xlsx':
+      console.log(`🔍 Using Excel extractor for: ${path.basename(filePath)}`);
+      try {
+        if (!fs.existsSync(filePath)) {
+          console.warn(`⚠️ Excel file not found: ${filePath}`);
+          return '';
+        }
+        
+        console.log(`🔍 Excel file exists, size: ${fs.statSync(filePath).size} bytes`);
+        const xlsxResult = await extractors.xlsx(filePath);
+        console.log(`🔍 Excel raw result type:`, typeof xlsxResult);
+        console.log(`🔍 Excel raw result:`, xlsxResult);
+        
+        // Excel extractor ส่งค่ากลับเป็น string ตรงๆ
+        const xlsxText = sanitizeText(xlsxResult || '');
+        console.log(`🔍 Excel result: ${xlsxText.length} chars`);
+        return xlsxText;
+      } catch (xlsxErr) {
+        console.warn(`⚠️ Excel extraction failed: ${xlsxErr.message}`);
+        return '';
+      }
+      
+    case '.docx':
+      console.log(`🔍 Using DOCX extractor for: ${path.basename(filePath)}`);
+      try {
+        const docxResult = await extractors.docx(filePath);
+        console.log(`🔍 DOCX raw result type:`, typeof docxResult);
+        console.log(`🔍 DOCX raw result:`, docxResult);
+        
+        // DOCX extractor ส่งค่ากลับเป็น string ตรงๆ
+        const docxText = sanitizeText(docxResult || '');
+        console.log(`🔍 DOCX result: ${docxText.length} chars`);
+        return docxText;
+      } catch (docxErr) {
+        console.warn(`⚠️ DOCX extraction failed: ${docxErr.message}`);
+        return '';
+      }
+      
+    case '.pptx':
+      console.log(`🔍 Using PPTX extractor for: ${path.basename(filePath)}`);
+      try {
+        const pptxResult = await extractors.pptx(filePath);
+        console.log(`🔍 PPTX raw result type:`, typeof pptxResult);
+        console.log(`🔍 PPTX raw result:`, pptxResult);
+        
+        // PPTX extractor ส่งค่ากลับเป็น string ตรงๆ
+        const pptxText = sanitizeText(pptxResult || '');
+        console.log(`🔍 PPTX result: ${pptxText.length} chars`);
+        return pptxText;
+      } catch (pptxErr) {
+        console.warn(`⚠️ PPTX extraction failed: ${pptxErr.message}`);
+        return '';
+      }
+      
+    default:
+      throw new Error(`Unsupported file type: ${ext}`);
+  }
+}
+
+/**
  * Extract text from file based on type
  */
 async function extractText(file, attachmentId = null) {
@@ -135,17 +290,20 @@ async function processAttachmentsOCR(limit = 30) {
 
       const hasText = text && text.trim().length > 0;
       
+      // ทำความสะอาดข้อความก่อนบันทึก
+      const sanitizedText = sanitizeText(text);
+      
       // อัปเดต extractedText ใน database ด้วยข้อมูลจริง
       if (hasText) {
         try {
           await prisma.attachment.update({
             where: { id: att.id },
             data: { 
-              extractedText: text,
+              extractedText: sanitizedText,
               ocrStatus: 'COMPLETED'
             }
           });
-          console.log(`  📊 Updated extracted text for ${att.fileName}: ${text.length} characters`);
+          console.log(`  📊 Updated extracted text for ${att.fileName}: ${sanitizedText.length} characters`);
         } catch (updateErr) {
           console.warn(`  ⚠️ Failed to update extracted text: ${updateErr.message}`);
         }
@@ -201,5 +359,6 @@ async function processAttachmentsOCR(limit = 30) {
 
 
 module.exports = { 
-  processAttachmentsOCR
+  extractTextFromPath,  // Pure Function สำหรับ Worker
+  processAttachmentsOCR // Legacy function (จะถูก replace ด้วย Worker)
 };

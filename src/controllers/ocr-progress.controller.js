@@ -1,4 +1,5 @@
 const { processAttachmentsOCR } = require('../services/attachment-ocr.service');
+const { processBatchWithWorkers } = require('../utils/thread-pool');
 
 // Store active SSE connections
 const activeConnections = new Set();
@@ -29,7 +30,7 @@ function broadcastProgress(progress) {
 
 // Enhanced OCR service with progress callbacks
 async function processAttachmentsWithProgress(limit = 30) {
-  const { processAttachmentsOCR } = require('../services/attachment-ocr.service');
+  // Use the imported service from top of file
   
   // Override the OCR service to emit progress
   const originalLog = console.log;
@@ -47,15 +48,15 @@ async function processAttachmentsWithProgress(limit = 30) {
         message.includes('📄 Processing PDF file:') ||
         message.includes('📊 Processing CSV file:') ||
         message.includes('📝 Processing document file:')) {
-      const match = message.match(/Processing (.+?):|Extracting text from: (.+?) \(/);
+      const match = message.match(/Processing (.+?) \((.+?)\)|Extracting text from: (.+?) \((.+?)\)/);
       if (match) {
-        const fileName = match[1] || match[2];
+        const fileName = match[1] || match[3];
         ocrProgress.currentFile = fileName;
         broadcastProgress(ocrProgress);
       }
     }
     
-    // Update processed count
+    // Update processed count from summary (more reliable)
     if (message.includes('✅ Summary: Processed') || 
         message.includes('✅ Summary:')) {
       const match = message.match(/Processed (\d+)\/(\d+)/);
@@ -71,12 +72,7 @@ async function processAttachmentsWithProgress(limit = 30) {
       broadcastProgress(ocrProgress);
     }
     
-    // Update processed count for successful extractions
-    if (message.includes('📊 Updated extracted text for') || 
-        message.includes('📊 Updated extracted text for')) {
-      ocrProgress.processed++;
-      broadcastProgress(ocrProgress);
-    }
+    // Remove duplicate processed count update - use summary only
   };
   
   console.error = (...args) => {
@@ -102,14 +98,43 @@ async function processAttachmentsWithProgress(limit = 30) {
       take: typeof limit === 'number' ? limit : undefined,
     });
 
+    // Set initial progress state BEFORE processing
     ocrProgress.totalFiles = attachments.length;
     ocrProgress.processed = 0;
     ocrProgress.errors = 0;
     ocrProgress.startTime = Date.now();
+    ocrProgress.currentFile = attachments.length > 0 ? 'กำลังเริ่มต้น...' : 'ไม่มีไฟล์ที่ต้องประมวลผล';
     broadcastProgress(ocrProgress);
 
-    // Process attachments
-    const result = await processAttachmentsOCR(limit);
+    // If no files to process, mark as completed immediately
+    if (attachments.length === 0) {
+      ocrProgress.isProcessing = false;
+      ocrProgress.currentFile = '✅ ไม่มีไฟล์ที่ต้องประมวลผล';
+      broadcastProgress(ocrProgress);
+      return { processed: 0, errors: 0, skipped: 0, results: [] };
+    }
+
+    // Process attachments with Worker Pool (Non-blocking)
+    console.log(`🎮 Found ${attachments.length} attachments to process`);
+    const attachmentsForWorkers = attachments.map(att => ({
+      filePath: att.filePath,
+      id: att.id,
+      fileName: att.fileName
+    }));
+    
+    console.log(`🎮 Using Worker Pool to process ${attachmentsForWorkers.length} files`);
+    const result = await processBatchWithWorkers(
+      attachmentsForWorkers,
+      (progress) => {
+        // Update progress from Worker Pool
+        ocrProgress.processed = progress.processed;
+        ocrProgress.errors = progress.errors;
+        ocrProgress.currentFile = progress.currentFile;
+        broadcastProgress(ocrProgress);
+      }
+    );
+    
+    console.log(`🎮 Worker Pool completed:`, result);
     
     // Final progress update - MARK AS COMPLETED
     ocrProgress.isProcessing = false;
@@ -166,11 +191,19 @@ async function startOcrWithProgress(req, res, limit = 30) {
       });
     }
 
+    // Set initial state and respond immediately (Non-blocking)
     ocrProgress.isProcessing = true;
     ocrProgress.currentFile = 'กำลังเริ่มต้น...';
     broadcastProgress(ocrProgress);
 
-    // Start processing in background with custom limit
+    // Respond to client immediately
+    res.json({
+      success: true,
+      message: 'OCR processing started',
+      isProcessing: true
+    });
+
+    // Start processing in background (non-blocking)
     processAttachmentsWithProgress(limit)
       .then(result => {
         console.log('✅ OCR processing completed:', result);
@@ -180,22 +213,17 @@ async function startOcrWithProgress(req, res, limit = 30) {
       .catch(err => {
         console.error('❌ OCR processing failed:', err);
         ocrProgress.isProcessing = false;
-        ocrProgress.errors++;
+        ocrProgress.currentFile = '❌ เกิดข้อผิดพลาด';
         broadcastProgress(ocrProgress);
       });
 
-    res.json({ 
-      success: true, 
-      message: 'OCR processing started',
-      progress: ocrProgress
-    });
-
   } catch (err) {
-    console.error('❌ Start OCR error:', err);
+    console.error('❌ Failed to start OCR:', err);
     ocrProgress.isProcessing = false;
-    res.status(500).json({ 
-      success: false, 
-      error: err.message 
+    res.status(500).json({
+      success: false,
+      message: 'Failed to start OCR processing',
+      error: err.message
     });
   }
 }

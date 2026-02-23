@@ -2,25 +2,14 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../utils/prisma');
 
-router.post('/attachments', (req, res) => {
-  // TO DO: implement /attachments endpoint
-  res.json({
-    status: 'success',
-    message: 'Attachments endpoint'
-  });
-});
-
 router.post('/process', async (req, res) => {
   try {
     console.log('🔍 Starting OCR processing with progress tracking...');
     
-    // Get limit from request body or default to 10
     const { limit = 10 } = req.body || {};
     
-    // Import the OCR progress controller function
     const { startOcrWithProgress } = require('../controllers/ocr-progress.controller');
     
-    // Start OCR with progress tracking
     startOcrWithProgress(req, res, limit);
     
   } catch (error) {
@@ -33,7 +22,6 @@ router.post('/process', async (req, res) => {
   }
 });
 
-// Get email summary statistics
 router.get('/summary', async (req, res) => {
   try {
     const totalEmails = await prisma.email.count();
