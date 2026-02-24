@@ -19,12 +19,11 @@ export default function App() {
   const {
     startDate,
     endDate,
-    log,
     isLoading,
+    log,
     error,
     lastFetchedEmails,
     showEmailDetails,
-    emailSummary,
     previewEmails,
     showEmailSelection,
     emailProgress,
@@ -36,7 +35,7 @@ export default function App() {
     showEmailDetailsModal,
     hideEmailDetailsModal,
     hideEmailSelectionModal,
-    fetchEmailSummary
+    resetState
   } = useEmailPipeline()
 
   const handleStartDateChange = (e) => {
@@ -50,11 +49,6 @@ export default function App() {
   const isFormValid = useMemo(() => {
     return Boolean(startDate || endDate)
   }, [startDate, endDate, isLoading])
-
-  // ดึงข้อมูลสรุปเมื่อ component mount
-  useEffect(() => {
-    fetchEmailSummary()
-  }, [])
 
   const buttonText = useMemo(() => {
     return isLoading ? '⏳ กำลังดำเนินการ...' : '📥 ดึงอีเมล'

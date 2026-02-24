@@ -1,17 +1,7 @@
 require('dotenv').config();
 const app = require('./app');
-const tempPathManager = require('./config/temp-paths');
 
 const PORT = process.env.PORT || 4000;
-
-// Cleanup temp directories on server start
-tempPathManager.cleanupAll();
-tempPathManager.cleanupOldFiles(0);
-
-// Schedule cleanup every 6 hours
-setInterval(() => {
-  tempPathManager.cleanupOldFiles(0.25); // 6 hours = 0.25 days
-}, 6 * 60 * 60 * 1000);
 
 // Add comprehensive error handling to prevent silent exits
 process.on('uncaughtException', (err) => {

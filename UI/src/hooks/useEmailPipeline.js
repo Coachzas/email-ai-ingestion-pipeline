@@ -1,15 +1,14 @@
 import { useState, useCallback, useEffect } from 'react'
 
 export const useEmailPipeline = () => {
-  const [state, setState] = useState({
+  const initialState = {
     startDate: '',
     endDate: '',
-    log: 'รอคำสั่ง...',
     isLoading: false,
+    log: '',
     error: null,
     lastFetchedEmails: null,
     showEmailDetails: false,
-    emailSummary: null,
     previewEmails: null,
     showEmailSelection: false,
     // Email saving progress state
@@ -21,7 +20,9 @@ export const useEmailPipeline = () => {
       processed: 0,
       errors: 0
     }
-  })
+  }
+
+  const [state, setState] = useState(initialState)
 
   // SSE connection for email progress
   useEffect(() => {
@@ -94,7 +95,6 @@ export const useEmailPipeline = () => {
       error: null,
       lastFetchedEmails: null,
       showEmailDetails: false,
-      emailSummary: null,
       previewEmails: null,
       showEmailSelection: false,
       // Email saving progress state
@@ -109,22 +109,6 @@ export const useEmailPipeline = () => {
     })
   }, [])
 
-
-  const setEmailSummary = useCallback((summary) => {
-    setState(prev => ({ ...prev, emailSummary: summary }))
-  }, [])
-
-  const fetchEmailSummary = useCallback(async () => {
-    try {
-      const response = await fetch('/api/ocr/summary')
-      if (!response.ok) throw new Error('Failed to fetch email summary')
-      
-      const data = await response.json()
-      setEmailSummary(data.summary)
-    } catch (err) {
-      // Silently ignore summary fetch errors
-    }
-  }, [])
 
   const fetchEmailsPreview = useCallback(async () => {
     setState(prev => ({ ...prev, isLoading: true, error: null, log: 'กำลังเชื่อมต่อ IMAP...\n' }))
@@ -201,8 +185,6 @@ export const useEmailPipeline = () => {
             `📎 บันทึกไฟล์แนบ ${data.attachmentSavedCount || 0} ไฟล์ (ข้าม ${data.attachmentSkippedCount || 0} ไฟล์)\n`
       }))
       
-      await fetchEmailSummary()
-      
       if (typeof window !== 'undefined' && window.location) {
         window.location.reload()
       }
@@ -214,7 +196,7 @@ export const useEmailPipeline = () => {
         log: `${prev.log}❌ เกิดข้อผิดพลาด: ${err.message}\n`
       }))
     }
-  }, [fetchEmailSummary])
+  }, [])
 
   return {
     ...state,
@@ -227,8 +209,6 @@ export const useEmailPipeline = () => {
     hideEmailDetailsModal,
     hideEmailSelectionModal,
     resetState,
-    setEmailSummary,
-    fetchEmailSummary,
     emailProgress: state.emailProgress
   }
 }

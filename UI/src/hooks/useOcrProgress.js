@@ -35,7 +35,17 @@ export function useOcrProgress() {
             ...data
           }))
           
-          if (data.isProcessing === false && prev.isProcessing === true) {
+          // ถ้า OCR เสร็จและมี refresh flag
+          if (data.refresh && data.completed) {
+            console.log('🔄 OCR completed, refreshing page...')
+            setTimeout(() => {
+              if (typeof window !== 'undefined' && window.location) {
+                window.location.reload()
+              }
+            }, 1000)
+          }
+          // ถ้า OCR เสร็จ (fallback)
+          else if (data.isProcessing === false && prev.isProcessing === true) {
             setTimeout(() => {
               if (typeof window !== 'undefined' && window.location) {
                 window.location.reload()

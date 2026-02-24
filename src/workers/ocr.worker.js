@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 module.exports = async ({ filePath, attachmentId }) => {
   try {
-    const text = await extractTextFromPath(filePath);
+    const text = await extractTextFromPath(filePath, attachmentId);
     
     await prisma.attachment.update({
       where: { id: attachmentId },

@@ -1,5 +1,5 @@
 const extractors = require('./extractors');
-const { runOCR } = require('./ocr/ocr.service');
+const GeminiOcrService = require('./gemini-ocr.service');
 const prisma = require('../utils/prisma');
 
 /**
@@ -25,14 +25,12 @@ function sanitizeText(text) {
  * PURE FUNCTION: ดึงข้อความจากไฟล์โดยไม่มี side effects
  * รับแค่ filePath และคืนข้อความเท่านั้น
  */
-async function extractTextFromPath(filePath) {
+async function extractTextFromPath(filePath, attachmentId = null) {
   const fs = require('fs');
   const path = require('path');
   
-  if (!fs.existsSync(filePath)) {
-    throw new Error(`File not found: ${filePath}`);
-  }
-
+  if (!fs.existsSync(filePath)) return '';
+  
   const ext = path.extname(filePath).toLowerCase();
   
   switch (ext) {
@@ -44,15 +42,21 @@ async function extractTextFromPath(filePath) {
     case '.gif':
       try {
         if (!fs.existsSync(filePath)) return '';
-        const ocrResult = await runOCR(filePath);
+        const geminiService = new GeminiOcrService();
+        const ocrResult = await geminiService.extractTextFromPath(filePath);
         return sanitizeText(ocrResult || '');
       } catch (ocrErr) {
         return '';
       }
       
     case '.pdf':
-      const pdfResult = await extractors.pdf(filePath);
-      return sanitizeText(pdfResult || '');
+      try {
+        if (!fs.existsSync(filePath)) return '';
+        const pdfResult = await extractors.pdf(filePath, attachmentId);
+        return sanitizeText(pdfResult || '');
+      } catch (pdfErr) {
+        return '';
+      }
       
     case '.csv':
       try {
@@ -60,6 +64,15 @@ async function extractTextFromPath(filePath) {
         const csvResult = await extractors.csv(filePath);
         return sanitizeText(csvResult || '');
       } catch (csvErr) {
+        return '';
+      }
+      
+    case '.docx':
+      try {
+        if (!fs.existsSync(filePath)) return '';
+        const docxResult = await extractors.docx(filePath);
+        return sanitizeText(docxResult || '');
+      } catch (docxErr) {
         return '';
       }
       
@@ -72,16 +85,9 @@ async function extractTextFromPath(filePath) {
         return '';
       }
       
-    case '.docx':
-      try {
-        const docxResult = await extractors.docx(filePath);
-        return sanitizeText(docxResult || '');
-      } catch (docxErr) {
-        return '';
-      }
-      
     case '.pptx':
       try {
+        if (!fs.existsSync(filePath)) return '';
         const pptxResult = await extractors.pptx(filePath);
         return sanitizeText(pptxResult || '');
       } catch (pptxErr) {
@@ -89,7 +95,7 @@ async function extractTextFromPath(filePath) {
       }
       
     default:
-      throw new Error(`Unsupported file type: ${ext}`);
+      return '';
   }
 }
 
@@ -101,7 +107,8 @@ async function extractText(file, attachmentId = null) {
 
   try {
     if (fileType.startsWith('image/')) {
-      return await runOCR(filePath);
+      const geminiService = new GeminiOcrService();
+      return await geminiService.extractTextFromPath(filePath);
     }
 
     if (fileType === 'application/pdf') {
@@ -137,10 +144,10 @@ async function extractText(file, attachmentId = null) {
 async function processAttachmentsOCR(limit = 30) {
   const attachments = await prisma.attachment.findMany({
     where: {
-      OR: [
-        { extractedText: null },
-        { extractedText: '' }
-      ]
+      // ดึงเฉพาะไฟล์ที่ยังไม่เคยทำ OCR สำเร็จ
+      NOT: {
+        ocrStatus: 'COMPLETED'
+      }
     },
     take: typeof limit === 'number' ? limit : undefined,
   });
@@ -183,12 +190,23 @@ async function processAttachmentsOCR(limit = 30) {
       const hasText = text && text.trim().length > 0;
       const sanitizedText = sanitizeText(text);
       
+      // บังคับให้อัปเดต size และ ocrStatus เสมอ
+      const updateData = {
+        size: Number(stats.size), // บังคับเป็น Number
+        ocrStatus: 'COMPLETED'
+      };
+      
+      // อัปเดต extractedText เฉพาะเมื่อมีข้อความ
+      if (hasText) {
+        updateData.extractedText = sanitizedText;
+      } else {
+        // ใช้ null แทน undefined เพื่อบังคับอัปเดต
+        updateData.extractedText = null;
+      }
+      
       await prisma.attachment.update({
         where: { id: att.id },
-        data: { 
-          extractedText: hasText ? sanitizedText : undefined,
-          ocrStatus: 'COMPLETED'
-        }
+        data: updateData
       });
       
       results.push({ fileName: att.fileName, status: hasText ? 'success' : 'no_text' });

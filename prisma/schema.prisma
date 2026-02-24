@@ -1,6 +1,51 @@
 generator client {
   provider = "prisma-client-js"
-  
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Email {
+  id          String       @id @default(uuid())
+  imapUid     Int          @unique
+  fromEmail   String
+  subject     String?
+  bodyText    String?
+  receivedAt  DateTime
+  createdAt   DateTime     @default(now())
+  accountId   String
+  attachments Attachment[]
+  account     EmailAccount @relation(fields: [accountId], references: [id])
+}
+
+model EmailAccount {
+  id         String        @id @default(uuid())
+  name       String
+  host       String
+  port       Int
+  secure     Boolean       @default(true)
+  username   String
+  password   String
+  status     AccountStatus @default(ACTIVE)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  isSelected Boolean       @default(false)
+  emails     Email[]
+}
+
+model Attachment {
+  id            String     @id @default(uuid())
+  emailId       String
+  fileName      String
+  fileType      String
+  filePath      String
+  size          Int?
+  extractedText String?
+  ocrStatus     OcrStatus?
+  createdAt     DateTime   @default(now())
+  email         Email      @relation(fields: [emailId], references: [id])
 }
 
 enum OcrStatus {
@@ -15,94 +60,3 @@ enum AccountStatus {
   INACTIVE
   ERROR
 }
-
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-
-}
-
-
-
-model Email {
-
-  id        String   @id @default(uuid())
-
-  imapUid  Int      @unique
-
-  fromEmail String
-
-  subject   String?
-
-  bodyText  String?
-
-  receivedAt DateTime
-
-  createdAt DateTime @default(now())
-
-  accountId String
-
-  attachments Attachment[]
-
-  account   EmailAccount @relation(fields: [accountId], references: [id])
-
-}
-
-model EmailAccount {
-
-  id        String   @id @default(uuid())
-
-  name      String
-
-  host      String
-
-  port      Int
-
-  secure    Boolean  @default(true)
-
-  username  String
-
-  password  String
-
-  status    AccountStatus @default(ACTIVE)
-
-  isSelected Boolean @default(false)
-
-  createdAt DateTime @default(now())
-
-  updatedAt DateTime @updatedAt
-
-  emails    Email[]
-
-}
-
-
-
-model Attachment {
-
-  id        String   @id @default(uuid())
-
-  emailId   String
-
-
-
-  fileName String
-
-  fileType String
-
-  filePath String
-
-  size     Int?
-
-  extractedText String?
-
-  ocrStatus OcrStatus?
-
-  createdAt DateTime @default(now())
-
-
-
-  email Email @relation(fields: [emailId], references: [id])
-
-}
-

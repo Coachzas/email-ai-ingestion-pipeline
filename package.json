@@ -12,6 +12,7 @@
   "type": "commonjs",
   "description": "",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@prisma/adapter-pg": "^7.2.0",
     "@prisma/client": "^6.19.2",
     "adm-zip": "^0.5.16",
@@ -27,11 +28,9 @@
     "node-fetch": "^3.3.2",
     "pdf-parse": "^1.1.0",
     "pdf-poppler": "^0.2.3",
-    "pdf2pic": "^3.2.0",
     "pdfjs-dist": "^5.4.624",
     "pg": "^8.17.1",
     "piscina": "^5.1.4",
-    "sharp": "^0.34.5",
     "tesseract.js": "^7.0.0",
     "xlsx": "^0.18.5"
   },

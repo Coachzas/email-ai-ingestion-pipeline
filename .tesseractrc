@@ -1,4 +1,0 @@
-# Tesseract Configuration
-# ป้องกันการดาวน์โหลด trained data ซ้ำซ้อน
-tessdata-dir ./tessdata
-disable-auto-download true

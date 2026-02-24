@@ -115,7 +115,17 @@ async function processAttachmentsWithProgress(limit = 30) {
     
     ocrProgress.isProcessing = false;
     ocrProgress.currentFile = '✅ เสร็จสิ้น';
+    ocrProgress.completed = true;
     broadcastProgress(ocrProgress);
+    
+    // ส่ง event ให้ refresh หน้า Email Review Center
+    setTimeout(() => {
+      broadcastProgress({
+        ...ocrProgress,
+        refresh: true,
+        message: '🔄 กรุณารีเฟรชหน้าเพื่อดูผลลัพธ์ล่าสุด'
+      });
+    }, 1000);
     
     return result;
   } finally {
