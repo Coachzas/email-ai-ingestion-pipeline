@@ -408,12 +408,13 @@ export default function AccountManager() {
 
         .account-header h2 {
           margin: 0;
-          color: #333;
+          color: #e7f3ff;
+          font-weight: 700;
         }
 
         .account-header p {
           margin: 5px 0 0 0;
-          color: #666;
+          color: #4b5563;
         }
 
         .selected-account {
@@ -432,12 +433,12 @@ export default function AccountManager() {
 
         .selected-name {
           font-weight: 500;
-          color: #333;
+          color: #111827;
           margin-left: 5px;
         }
 
         .selected-email {
-          color: #666;
+          color: #4b5563;
           margin-left: 5px;
         }
 
@@ -466,7 +467,7 @@ export default function AccountManager() {
 
         .account-form h3 {
           margin: 0 0 20px 0;
-          color: #333;
+          color: #111827;
         }
 
         .form-group {
@@ -486,7 +487,7 @@ export default function AccountManager() {
           display: block;
           margin-bottom: 5px;
           font-weight: 500;
-          color: #333;
+          color: #111827;
         }
 
         .form-group input[type="text"],
@@ -540,7 +541,7 @@ export default function AccountManager() {
 
         .account-card .account-header h4 {
           margin: 0;
-          color: #333;
+          color: #111827;
         }
 
         .account-details {
@@ -550,7 +551,7 @@ export default function AccountManager() {
         .account-details p {
           margin: 5px 0;
           font-size: 14px;
-          color: #666;
+          color: #4b5563;
         }
 
         .account-actions {
@@ -583,7 +584,7 @@ export default function AccountManager() {
         .loading, .empty-state {
           text-align: center;
           padding: 40px;
-          color: #666;
+          color: #4b5563;
         }
 
         .error-message {

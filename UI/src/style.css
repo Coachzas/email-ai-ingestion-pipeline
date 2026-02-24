@@ -348,6 +348,38 @@ button:active:not(:disabled) {
 
 /* Email Selection Styles */
 
+.email-selection-header {
+
+  padding: 16px 0;
+
+  border-bottom: 1px solid #e5e7eb;
+
+}
+
+.email-selection-header h3 {
+
+  margin: 0 0 8px 0;
+
+  color: #111827;
+
+  font-size: 18px;
+
+  font-weight: 600;
+
+}
+
+.email-selection-header p {
+
+  margin: 0;
+
+  color: #6b7280;
+
+  font-size: 14px;
+
+  line-height: 1.5;
+
+}
+
 .email-selection-controls {
 
   display: flex;
@@ -1194,6 +1226,8 @@ button:active:not(:disabled) {
 
   font-size: 13px;
 
+  color: #111827;
+
 }
 
 
@@ -1345,6 +1379,14 @@ button:active:not(:disabled) {
 }
 
 
+
+.review-panel strong {
+
+  color: #111827;
+
+  font-weight: 600;
+
+}
 
 .review-panel {
 
@@ -1541,6 +1583,18 @@ button:active:not(:disabled) {
 }
 
 
+
+.attachment-details summary {
+
+  color: #111827;
+
+  font-weight: 500;
+
+  cursor: pointer;
+
+  padding: 4px 0;
+
+}
 
 .attachment-details {
 

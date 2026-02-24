@@ -6,6 +6,7 @@ import ReviewQueue from './components/ReviewQueue.jsx'
 import ReviewEmailModal from './components/ReviewEmailModal.jsx'
 import EmailProgressIndicator from './components/EmailProgressIndicator.jsx'
 import AccountManager from './components/AccountManager.jsx'
+import TokenUsage from './components/TokenUsage.jsx'
 import { useEmailPipeline } from './hooks/useEmailPipeline'
 
 // Lazy load components
@@ -13,7 +14,7 @@ const EmailDetails = lazy(() => import('./components/EmailDetails.jsx'))
 
 export default function App() {
   const [reviewEmailId, setReviewEmailId] = useState(null)
-  const [currentView, setCurrentView] = useState('pipeline') // 'pipeline' or 'accounts'
+  const [currentView, setCurrentView] = useState('pipeline') // 'pipeline', 'accounts', or 'tokens'
   const [displayLimit, setDisplayLimit] = useState('all') // Limit for displaying in EmailSelection ('all' for no limit)
 
   const {
@@ -64,147 +65,205 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <div className="container">
-        <header>
-          <h1>📧 Email AI Pipeline</h1>
-          <nav className="main-nav">
-            <button 
-              className={`nav-button ${currentView === 'pipeline' ? 'active' : ''}`}
-              onClick={() => setCurrentView('pipeline')}
-            >
-              📧 จัดการอีเมล
-            </button>
-            <button 
-              className={`nav-button ${currentView === 'accounts' ? 'active' : ''}`}
-              onClick={() => setCurrentView('accounts')}
-            >
-              🔧 จัดการบัญชี
-            </button>
-          </nav>
-          {currentView === 'pipeline' && (
-            <p>เลือกช่วงวันที่เพื่อดึงอีเมลจาก IMAP</p>
-          )}
-        </header>
-
-        {error && (
-          <div 
-            className="error-message" 
-            role="alert" 
-            aria-live="polite"
-            id="error-message"
+      <div className="app">
+        <nav style={{ 
+          padding: '10px 20px', 
+          backgroundColor: '#111', 
+          borderBottom: '1px solid #333',
+          marginBottom: '20px',
+          display: 'flex',
+          gap: '10px',
+          alignItems: 'center'
+        }}>
+          <button 
+            onClick={() => setCurrentView('pipeline')}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: currentView === 'pipeline' ? '#007bff' : '#333',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              marginRight: '10px',
+              cursor: 'pointer'
+            }}
           >
-            <span>❌ {error.message}</span>
-            <button 
-              onClick={clearError} 
-              className="close-error"
-              aria-label="ปิดข้อความแจ้งข้อผิดพลาด"
-            >
-              ×
-            </button>
-          </div>
-        )}
+            📧 จัดการอีเมล
+          </button>
+          <button 
+            onClick={() => setCurrentView('accounts')}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: currentView === 'accounts' ? '#007bff' : '#333',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              marginRight: '10px',
+              cursor: 'pointer'
+            }}
+          >
+            👤 Accounts
+          </button>
+          <button 
+            onClick={() => setCurrentView('tokens')}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: currentView === 'tokens' ? '#007bff' : '#333',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            📊 Token Usage
+          </button>
+        </nav>
 
-        {currentView === 'pipeline' ? (
-          <>
-            <form className="controls" onSubmit={(e) => { e.preventDefault(); fetchEmailsPreview(); }}>
-              <label>
-                วันที่เริ่มต้น
-                <input 
-                  type="date" 
-                  value={startDate} 
-                  onChange={handleStartDateChange} 
-                  disabled={isLoading}
-                  aria-label="วันที่เริ่มต้น"
-                  aria-describedby="start-date-description"
-                />
-              </label>
-              <label>
-                วันที่สิ้นสุด
-                <input 
-                  type="date" 
-                  value={endDate} 
-                  onChange={handleEndDateChange} 
-                  disabled={isLoading}
-                  aria-label="วันที่สิ้นสุด"
-                  aria-describedby="end-date-description"
-                />
-              </label>
-              <div className="fetch-email-container">
+        <div style={{ padding: '0 20px' }}>
+          {currentView === 'pipeline' && (
+            <p style={{ color: '#ccc', marginBottom: '20px' }}>เลือกช่วงวันที่เพื่อดึงอีเมลจาก IMAP</p>
+          )}
+
+          {error && (
+            <div 
+              className="error-message" 
+              role="alert" 
+              aria-live="polite"
+              id="error-message"
+              style={{ 
+                backgroundColor: '#dc3545', 
+                color: '#fff', 
+                padding: '10px', 
+                borderRadius: '4px', 
+                marginBottom: '20px' 
+              }}
+            >
+              <span>❌ {error.message}</span>
               <button 
-                type="submit" 
-                disabled={!isFormValid || isLoading}
-                aria-describedby="submit-description"
-              >
-                {buttonText}
-              </button>
-              <select 
-                value={displayLimit} 
-                onChange={(e) => setDisplayLimit(e.target.value)}
-                style={{
-                  marginLeft: '8px', 
-                  padding: '4px 8px', 
-                  fontSize: '12px',
-                  borderRadius: '4px',
-                  border: '1px solid #555',
-                  backgroundColor: '#222',
-                  color: '#fff'
+                onClick={clearError} 
+                className="close-error"
+                aria-label="ปิดข้อความแจ้งข้อผิดพลาด"
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  color: '#fff', 
+                  fontSize: '18px', 
+                  cursor: 'pointer',
+                  marginLeft: '10px'
                 }}
               >
-                <option value="all">แสดงทั้งหมด</option>
-                <option value={200}>แสดง: 200</option>
-                <option value={100}>แสดง: 100</option>
-                <option value={50}>แสดง: 50</option>
-                <option value={10}>แสดง: 10</option>
-              </select>
+                ×
+              </button>
             </div>
-            </form>
+          )}
 
-            <div id="log" role="log" aria-live="polite">
-              <pre>{log}</pre>
-            </div>
+          {currentView === 'pipeline' && (
+            <>
+              <form className="controls" onSubmit={(e) => { e.preventDefault(); fetchEmailsPreview(); }}>
+                <label>
+                  วันที่เริ่มต้น
+                  <input 
+                    type="date" 
+                    value={startDate} 
+                    onChange={handleStartDateChange} 
+                    disabled={isLoading}
+                    aria-label="วันที่เริ่มต้น"
+                    aria-describedby="start-date-description"
+                  />
+                </label>
+                <label>
+                  วันที่สิ้นสุด
+                  <input 
+                    type="date" 
+                    value={endDate} 
+                    onChange={handleEndDateChange} 
+                    disabled={isLoading}
+                    aria-label="วันที่สิ้นสุด"
+                    aria-describedby="end-date-description"
+                  />
+                </label>
+                <div className="fetch-email-container">
+                  <button 
+                    type="submit" 
+                    disabled={!isFormValid || isLoading}
+                    aria-describedby="submit-description"
+                  >
+                    {buttonText}
+                  </button>
+                  <select 
+                    value={displayLimit} 
+                    onChange={(e) => setDisplayLimit(e.target.value)}
+                    style={{
+                      marginLeft: '8px', 
+                      padding: '4px 8px', 
+                      fontSize: '12px',
+                      borderRadius: '4px',
+                      border: '1px solid #555',
+                      backgroundColor: '#222',
+                      color: '#fff'
+                    }}
+                  >
+                    <option value="all">แสดงทั้งหมด</option>
+                    <option value={200}>แสดง: 200</option>
+                    <option value={100}>แสดง: 100</option>
+                    <option value={50}>แสดง: 50</option>
+                    <option value={10}>แสดง: 10</option>
+                  </select>
+                </div>
+              </form>
 
-            {/* Email Progress Indicator */}
-            <EmailProgressIndicator 
-              isProcessing={emailProgress.isProcessing}
-              progress={emailProgress.progress}
-              currentEmail={emailProgress.currentEmail}
-              totalEmails={emailProgress.totalEmails}
-              processed={emailProgress.processed}
-              errors={emailProgress.errors}
-            />
+              <div id="log" role="log" aria-live="polite">
+                <pre>{log}</pre>
+              </div>
 
-            <ReviewQueue onOpenEmail={openReviewEmail} />
+              {/* Email Progress Indicator */}
+              <EmailProgressIndicator 
+                isProcessing={emailProgress.isProcessing}
+                progress={emailProgress.progress}
+                currentEmail={emailProgress.currentEmail}
+                totalEmails={emailProgress.totalEmails}
+                processed={emailProgress.processed}
+                errors={emailProgress.errors}
+              />
 
-            {showEmailDetails && lastFetchedEmails && (
-              <Suspense fallback={<div className="modal-loading"><LoadingSpinner message="กำลังโหลด..." /></div>}>
-                <EmailDetails 
-                  emails={lastFetchedEmails.emails}
-                  onClose={hideEmailDetailsModal}
-                />
-              </Suspense>
-            )}
+              <ReviewQueue onOpenEmail={openReviewEmail} />
 
-            {showEmailSelection && previewEmails && (
-              <Suspense fallback={<div className="modal-loading"><LoadingSpinner message="กำลังโหลด..." /></div>}>
-                <EmailSelection 
-                  emails={previewEmails}
-                  isLoading={isLoading}
-                  onClose={hideEmailSelectionModal}
-                  onSaveSelected={saveSelectedEmails}
-                  emailLimit={displayLimit}
-                />
-              </Suspense>
-            )}
-          </>
-        ) : (
-          <AccountManager />
-        )}
+              {showEmailDetails && lastFetchedEmails && (
+                <Suspense fallback={<div className="modal-loading"><LoadingSpinner message="กำลังโหลด..." /></div>}>
+                  <EmailDetails 
+                    emails={lastFetchedEmails.emails}
+                    onClose={hideEmailDetailsModal}
+                  />
+                </Suspense>
+              )}
 
-        {reviewEmailId && (
-          <ReviewEmailModal emailId={reviewEmailId} onClose={closeReviewEmail} />
-        )}
-      </div>
+              {showEmailSelection && previewEmails && (
+                <Suspense fallback={<div className="modal-loading"><LoadingSpinner message="กำลังโหลด..." /></div>}>
+                  <EmailSelection 
+                    emails={previewEmails}
+                    isLoading={isLoading}
+                    onClose={hideEmailSelectionModal}
+                    onSaveSelected={saveSelectedEmails}
+                    emailLimit={displayLimit}
+                  />
+                </Suspense>
+              )}
+            </>
+          )}
 
+          {currentView === 'accounts' && (
+            <AccountManager />
+          )}
+
+          {currentView === 'tokens' && (
+            <TokenUsage />
+          )}
+
+          {reviewEmailId && (
+            <ReviewEmailModal emailId={reviewEmailId} onClose={closeReviewEmail} />
+          )}
+        </div>
+      </div>  
+          
       <style jsx>{`
         body {
           margin: 0;
@@ -212,7 +271,7 @@ export default function App() {
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
             'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
             sans-serif;
-          background-color: #000;
+          background-color: #1a1a1a;
           color: #fff;
         }
         
