@@ -1,6 +1,7 @@
 const { fetchEmails, fetchEmailByUid } = require('../services/imap.service');
 
 const prisma = require('../utils/prisma');
+const { extractTextFromPath } = require('../services/attachment-ocr.service');
 
 const { 
   startEmailProgress, 
@@ -142,6 +143,9 @@ async function saveSelectedEmails(req, res) {
             skipped: 0
         };
 
+        // 1. สร้างตัวแปรไว้เก็บข้อมูลทั้งหมดที่จะส่ง
+        const allWebhookPayloads = [];
+
         const fs = require('fs');
         const path = require('path');
 
@@ -218,6 +222,63 @@ async function saveSelectedEmails(req, res) {
                     }
                 }
 
+                // เพิ่มการทำ OCR และเตรียมข้อมูลสำหรับ n8n
+                let processedAttachments = [];
+                if (fullEmail.attachments && fullEmail.attachments.length > 0) {
+                    for (const attachment of fullEmail.attachments) {
+                        try {
+                            const filePath = path.join(__dirname, '../../storage', savedEmail.id, attachment.filename);
+                            const extractedText = await extractTextFromPath(filePath);
+                            
+                            processedAttachments.push({
+                                filename: attachment.filename,
+                                contentType: attachment.contentType,
+                                size: attachment.size,
+                                content: attachment.content ? attachment.content.toString('base64') : null,
+                                extractedText: extractedText,
+                                ocrStatus: 'COMPLETED'
+                            });
+                            console.log(`✅ OCR completed for ${attachment.filename}`);
+                        } catch (ocrErr) {
+                            console.error(`❌ OCR failed for ${attachment.filename}:`, ocrErr.message);
+                            processedAttachments.push({
+                                filename: attachment.filename,
+                                contentType: attachment.contentType,
+                                size: attachment.size,
+                                content: attachment.content ? attachment.content.toString('base64') : null,
+                                extractedText: null,
+                                ocrStatus: 'FAILED',
+                                error: ocrErr.message
+                            });
+                        }
+                    }
+                }
+
+                // 2. แทนที่จะส่ง webhook ทันที ให้เก็บใส่ Array ไว้ก่อน
+                const currentEmailPayload = {
+                    event: 'email_saved_with_ocr',
+                    timestamp: new Date().toISOString(),
+                    email: {
+                        id: savedEmail.id,
+                        imapUid: savedEmail.imapUid,
+                        from: fullEmail.from?.text || '',
+                        subject: fullEmail.subject || '',
+                        bodyText: fullEmail.text || '',
+                        bodyHtml: fullEmail.html || '',
+                        receivedAt: fullEmail.date || new Date(),
+                        accountId: account.id
+                    },
+                    attachments: processedAttachments,
+                    attachmentStats: {
+                        total: processedAttachments.length,
+                        withText: processedAttachments.filter(att => att.extractedText && att.extractedText.trim().length > 0).length,
+                        ocrCompleted: processedAttachments.filter(att => att.ocrStatus === 'COMPLETED').length,
+                        ocrFailed: processedAttachments.filter(att => att.ocrStatus === 'FAILED').length
+                    }
+                };
+                allWebhookPayloads.push(currentEmailPayload);
+                console.log(`✅ Prepared payload for email ${savedEmail.id}`);
+
                 savedEmails.push(savedEmail);
                 incrementProcessed();
 
@@ -228,6 +289,41 @@ async function saveSelectedEmails(req, res) {
                 });
                 incrementErrors();
             }
+        }
+
+        // 3. เมื่อวนลูปครบทุกอีเมลแล้ว ค่อยส่งไป n8n ครั้งเดียว (เป็น Array)
+        if (process.env.N8N_WEBHOOK_URL && allWebhookPayloads.length > 0) {
+            try {
+                const axios = require('axios');
+                console.log(`� Sending ${allWebhookPayloads.length} emails to n8n webhook`);
+                console.log('📦 Total payload size:', JSON.stringify(allWebhookPayloads).length, 'characters');
+                
+                // ส่ง Array ของอีเมลทั้งหมดไปในครั้งเดียว
+                const response = await axios.post(process.env.N8N_WEBHOOK_URL, allWebhookPayloads, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'User-Agent': 'Email-AI-Pipeline/1.0'
+                    },
+                    timeout: 60000
+                });
+                
+                console.log(`✅ Sent all ${allWebhookPayloads.length} emails to n8n`);
+                console.log('📄 Response status:', response.status);
+                console.log('📄 Response data:', response.data);
+            } catch (webhookErr) {
+                console.error('❌ Webhook error:', webhookErr.message);
+                console.error('❌ Error details:', {
+                    message: webhookErr.message,
+                    code: webhookErr.code,
+                    status: webhookErr.response?.status,
+                    statusText: webhookErr.response?.statusText,
+                    data: webhookErr.response?.data
+                });
+            }
+        } else if (allWebhookPayloads.length === 0) {
+            console.log('⚠️ No emails processed, skipping webhook');
+        } else {
+            console.log('⚠️ N8N_WEBHOOK_URL not set, skipping webhook');
         }
 
         await completeEmailProgress();
