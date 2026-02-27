@@ -4,15 +4,12 @@ const EmailSelection = ({
   emails, 
   onClose, 
   onSaveSelected, 
-  isLoading = false,
-  emailLimit = 50 
+  isLoading = false
 }) => {
   const [selectedEmails, setSelectedEmails] = useState(new Set())
   const [selectAll, setSelectAll] = useState(false)
 
-  const displayEmails = emailLimit === 'all' ? emails : emails.slice(0, emailLimit);
-  const displayLimitText = emailLimit === 'all' ? 'ทั้งหมด' : emailLimit;
-  const displayCount = emailLimit === 'all' ? emails.length : Math.min(emails.length, emailLimit);
+  const displayEmails = emails;
 
   const handleToggleEmail = (tempId) => {
     const newSelected = new Set(selectedEmails)
@@ -91,10 +88,6 @@ const EmailSelection = ({
         
         <div className="email-selection-header" style={{ padding: '0 20px' }}>
           <h3>เลือกอีเมลที่ต้องการบันทึก</h3>
-          <p>
-            แสดง {displayCount} จาก {emails.length} อีเมล<br/>
-            (จำกัด: {displayLimitText})
-          </p>
         </div>
 
         <div className="modal-body">

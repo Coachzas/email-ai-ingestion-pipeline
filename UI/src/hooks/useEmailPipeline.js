@@ -144,7 +144,7 @@ export const useEmailPipeline = () => {
         previewEmails: data.emails,
         showEmailSelection: true,
         log: `✅ พบอีเมล ${data.emails.length} ฉบับ\n` +
-            `📎 มีไฟล์แนบ ${data.withAttachments} ฉบับ\n` +
+            `📎 มีไฟล์แนบ ${data.withAttachments || 0} ฉบับ\n` +
             `📋 กรุณาเลือกอีเมลที่ต้องการบันทึก\n`
       }))
     } catch (err) {

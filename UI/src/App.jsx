@@ -15,7 +15,6 @@ const EmailDetails = lazy(() => import('./components/EmailDetails.jsx'))
 export default function App() {
   const [reviewEmailId, setReviewEmailId] = useState(null)
   const [currentView, setCurrentView] = useState('pipeline') // 'pipeline', 'accounts', or 'tokens'
-  const [displayLimit, setDisplayLimit] = useState('all') // Limit for displaying in EmailSelection ('all' for no limit)
 
   const {
     startDate,
@@ -189,25 +188,6 @@ export default function App() {
                   >
                     {buttonText}
                   </button>
-                  <select 
-                    value={displayLimit} 
-                    onChange={(e) => setDisplayLimit(e.target.value)}
-                    style={{
-                      marginLeft: '8px', 
-                      padding: '4px 8px', 
-                      fontSize: '12px',
-                      borderRadius: '4px',
-                      border: '1px solid #555',
-                      backgroundColor: '#222',
-                      color: '#fff'
-                    }}
-                  >
-                    <option value="all">แสดงทั้งหมด</option>
-                    <option value={200}>แสดง: 200</option>
-                    <option value={100}>แสดง: 100</option>
-                    <option value={50}>แสดง: 50</option>
-                    <option value={10}>แสดง: 10</option>
-                  </select>
                 </div>
               </form>
 
@@ -243,7 +223,6 @@ export default function App() {
                     isLoading={isLoading}
                     onClose={hideEmailSelectionModal}
                     onSaveSelected={saveSelectedEmails}
-                    emailLimit={displayLimit}
                   />
                 </Suspense>
               )}
@@ -290,6 +269,14 @@ export default function App() {
           color: #fff;
           cursor: pointer;
           transition: border-color 0.2s;
+          opacity: 1;
+          pointer-events: auto;
+        }
+
+        .fetch-email-container select:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+          pointer-events: none;
         }
 
         .fetch-email-container select:hover {
