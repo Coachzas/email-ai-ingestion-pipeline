@@ -80,14 +80,15 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
       for (const uid of newUids) {
         try {
           const msg = await client.fetchOne(uid, {
-            source: true,
-            bodyStructure: true,
-            envelope: true,
+            envelope: true,     // หัวข้อ, ผู้ส่ง, วันที่
+            bodyStructure: true, // ✅ โครงสร้าง + จำนวนไฟล์แนบ
+            uid: true,
+            flags: true,
+            size: true
           });
-          const parsed = await simpleParser(msg.source);
 
           // --- เพิ่มส่วนตะแกรงร่อนตรงนี้ ---
-          const receivedAt = parsed.date || new Date();
+          const receivedAt = msg.envelope.date ? new Date(msg.envelope.date) : new Date();
           if (startDate || endDate) {
             const startFilter = startDate ? new Date(startDate) : null;
             const endFilter = endDate ? new Date(endDate) : null;
@@ -101,21 +102,50 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
               continue;
           }
 
+          // แปลง bodyStructure เป็นข้อมูลไฟล์แนบ (ไม่โหลดตัวไฟล์จริง)
+          const attachments = [];
+          if (msg.bodyStructure) {
+            const extractAttachments = (parts) => {
+              if (!parts) return;
+              
+              // ถ้าเป็น array ให้วนลูปแต่ละ element
+              if (Array.isArray(parts)) {
+                parts.forEach(part => extractAttachments(part));
+                return;
+              }
+              
+              // ถ้าเป็น object ที่มี childNodes ให้วนลูป childNodes ก่อน
+              if (parts.childNodes) {
+                parts.childNodes.forEach(child => extractAttachments(child));
+              }
+              
+              // ถ้าเป็น object ที่มี parts ให้วนลูป parts
+              if (parts.parts) {
+                parts.parts.forEach(part => extractAttachments(part));
+              }
+              
+              // ตรวจสอบว่าเป็น attachment หรือไม่
+              if (parts.disposition === 'attachment') {
+                attachments.push({
+                  filename: parts.dispositionParameters?.filename || parts.parameters?.name || 'unknown',
+                  contentType: parts.type || 'application/octet-stream',
+                  size: parts.size || 0,
+                  hasContent: false // Preview ไม่มีตัวไฟล์จริง
+                });
+              }
+            };
+            extractAttachments(msg.bodyStructure);
+          }
+
           previewEmails.push({
             imapUid: uid,
-            from: parsed.from?.text || "Unknown",
-            subject: parsed.subject || "No Subject",
+            from: msg.envelope.from?.text || "Unknown",
+            subject: msg.envelope.subject || "No Subject",
             date: receivedAt,
-            text: parsed.text,
-            html: parsed.html,
-            attachments:
-              parsed.attachments?.map((att) => ({
-                filename: att.filename,
-                contentType: att.contentType,
-                size: att.size,
-                content: att.content,
-                path: att.path,
-              })) || [],
+            text: null,  // Preview ไม่ต้องการเนื้อหา
+            html: null,   // Preview ไม่ต้องการ HTML
+            attachments: attachments, // ✅ ข้อมูลไฟล์แนบ (ไม่มีตัวไฟล์จริง)
+            size: msg.size || 0,
           });
         } catch (msgErr) {}
       }

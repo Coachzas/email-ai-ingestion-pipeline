@@ -132,7 +132,7 @@ const EmailSelection = ({
                     <div className="email-header">{email.subject}</div>
                     <div className="email-meta">
                       <span>
-                        <strong>จาก:</strong> {email.fromEmail}
+                        <strong>จาก:</strong> {email.from}
                       </span>
                       <span>
                         <strong>วันที่:</strong> {formatDate(email.receivedAt)}
