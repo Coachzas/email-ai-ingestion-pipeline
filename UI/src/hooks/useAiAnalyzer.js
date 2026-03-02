@@ -24,12 +24,12 @@ export function useAiAnalyzer() {
     setShowAiAnalyzer(false)
   }, [])
 
-  const startAnalysis = useCallback(async (criteriaFile, selectedItems, options) => {
+  const startAnalysis = useCallback(async (criteriaFile, selectedEmails, options) => {
     setAnalysisProgress({
       isProcessing: true,
       progress: 0,
       currentEmail: 'กำลังเริ่มต้น...',
-      totalEmails: selectedItems.length,
+      totalEmails: selectedEmails.length,
       processed: 0,
       errors: 0,
       startTime: Date.now()
@@ -39,28 +39,28 @@ export function useAiAnalyzer() {
       // TODO: Implement actual AI analysis API call
       console.log('Starting AI analysis:', {
         criteriaFile,
-        selectedItems,
+        selectedEmails,
         options
       })
 
       // Mock progress simulation
-      for (let i = 0; i < selectedItems.length; i++) {
+      for (let i = 0; i < selectedEmails.length; i++) {
         await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate processing
         
         setAnalysisProgress(prev => ({
           ...prev,
           processed: i + 1,
-          progress: ((i + 1) / selectedItems.length) * 100,
+          progress: ((i + 1) / selectedEmails.length) * 100,
           currentEmail: `กำลังวิเคราะห์อีเมลที่ ${i + 1}`
         }))
       }
 
       // Mock results
-      const mockResults = selectedItems.map((item, index) => ({
-        id: item.id,
+      const mockResults = selectedEmails.map((emailId, index) => ({
+        id: emailId,
         name: `ผู้สมัคร ${index + 1}`,
         position: 'Software Developer',
-        email: item.from || `candidate${index + 1}@example.com`,
+        email: `candidate${index + 1}@example.com`,
         phone: `080-123-456${index}`,
         score: Math.floor(Math.random() * 40) + 60, // 60-100
         status: ['ผ่าน', 'พิจารณา', 'ไม่ผ่าน'][Math.floor(Math.random() * 3)],
@@ -74,7 +74,7 @@ export function useAiAnalyzer() {
           { criteria: 'React', percentage: 70 },
           { criteria: 'Database', percentage: 60 }
         ],
-        originalEmail: item.subject || `Email content for ${item.id}...`
+        originalEmail: `Email content for ${emailId}...`
       }))
 
       setAnalysisResults(mockResults)

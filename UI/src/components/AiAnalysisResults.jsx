@@ -2,7 +2,8 @@ import React, { useState } from 'react'
 
 export default function AiAnalysisResults({ 
   results, 
-  onClose
+  onClose,
+  onExport 
 }) {
   const [selectedCandidate, setSelectedCandidate] = useState(null)
 

@@ -126,10 +126,10 @@ export default function AiResumeAnalyzer({
                   <label htmlFor={`item-${item.id}`} className="email-label">
                     <div className="email-info">
                       <div className="email-subject">{item.subject}</div>
-                      <div className="email-from">{item.from}</div>
+                      <div className="email-from">{item.fromEmail || item.from}</div>
                       <div className="email-meta">
                         <span className="email-date">
-                          {new Date(item.createdAt).toLocaleDateString('th-TH')}
+                          {item.receivedAt ? new Date(item.receivedAt).toLocaleDateString('th-TH') : 'ไม่ระบุวันที่'}
                         </span>
                         {item.attachmentCount > 0 && (
                           <span className="attachment-count">
@@ -223,3 +223,30 @@ export default function AiResumeAnalyzer({
     </div>
   )
 }
+
+// Add styles to make email items equal height
+const style = document.createElement('style');
+style.textContent = `
+  .email-item {
+    min-height: 100px;
+    height: auto;
+    display: flex;
+    align-items: stretch;
+  }
+  
+  .email-label {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+  
+  .email-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 76px;
+  }
+`;
+document.head.appendChild(style);

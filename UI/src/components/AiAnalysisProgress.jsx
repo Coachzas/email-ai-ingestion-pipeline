@@ -1,10 +1,9 @@
 import React from 'react'
 
 export default function AiAnalysisProgress({ 
-  analysisProgress, 
-  onCancel 
+  analysisProgress 
 }) {
-  if (!analysisProgress?.isProcessing) return null
+  if (!analysisProgress || !analysisProgress.isProcessing) return null
 
   const { currentEmail, totalEmails, processed, errors } = analysisProgress
   const progressPercentage = totalEmails > 0 ? (processed / totalEmails) * 100 : 0
@@ -14,15 +13,6 @@ export default function AiAnalysisProgress({
       <div className="ai-progress-modal">
         <div className="progress-header">
           <h3>🤖 กำลังวิเคราะห์ Resume...</h3>
-          {onCancel && (
-            <button 
-              className="cancel-btn" 
-              onClick={onCancel}
-              aria-label="ยกเลิกการวิเคราะห์"
-            >
-              ×
-            </button>
-          )}
         </div>
         
         <div className="progress-body">
