@@ -7,8 +7,6 @@ export const useEmailPipeline = () => {
     isLoading: false,
     log: '',
     error: null,
-    lastFetchedEmails: null,
-    showEmailDetails: false,
     previewEmails: null,
     showEmailSelection: false,
     // Email saving progress state
@@ -74,41 +72,9 @@ export const useEmailPipeline = () => {
     setState(prev => ({ ...prev, error: null }))
   }, [])
 
-  const showEmailDetailsModal = useCallback(() => {
-    setState(prev => ({ ...prev, showEmailDetails: true }))
-  }, [])
-
-  const hideEmailDetailsModal = useCallback(() => {
-    setState(prev => ({ ...prev, showEmailDetails: false }))
-  }, [])
-
   const hideEmailSelectionModal = useCallback(() => {
     setState(prev => ({ ...prev, showEmailSelection: false, previewEmails: null }))
   }, [])
-
-  const resetState = useCallback(() => {
-    setState({
-      startDate: '',
-      endDate: '',
-      log: 'รอคำสั่ง...',
-      isLoading: false,
-      error: null,
-      lastFetchedEmails: null,
-      showEmailDetails: false,
-      previewEmails: null,
-      showEmailSelection: false,
-      // Email saving progress state
-      emailProgress: {
-        isProcessing: false,
-        progress: 0,
-        currentEmail: '',
-        totalEmails: 0,
-        processed: 0,
-        errors: 0
-      }
-    })
-  }, [])
-
 
   const fetchEmailsPreview = useCallback(async () => {
     setState(prev => ({ ...prev, isLoading: true, error: null, log: 'กำลังเชื่อมต่อ IMAP...\n' }))
@@ -140,11 +106,10 @@ export const useEmailPipeline = () => {
       setState(prev => ({
         ...prev,
         isLoading: false,
-        lastFetchedEmails: data,
         previewEmails: data.emails,
         showEmailSelection: true,
         log: `✅ พบอีเมล ${data.emails.length} ฉบับ\n` +
-            `📎 มีไฟล์แนบ ${data.withAttachments || 0} ฉบับ\n` +
+            `📎 มีไฟล์แนบ ${data.emails.filter(email => email.attachmentCount > 0).length} ฉบับ\n` +
             `📋 กรุณาเลือกอีเมลที่ต้องการบันทึก\n`
       }))
     } catch (err) {
@@ -205,10 +170,7 @@ export const useEmailPipeline = () => {
     fetchEmailsPreview,
     saveSelectedEmails,
     clearError,
-    showEmailDetailsModal,
-    hideEmailDetailsModal,
     hideEmailSelectionModal,
-    resetState,
     emailProgress: state.emailProgress
   }
 }

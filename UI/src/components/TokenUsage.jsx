@@ -11,7 +11,9 @@ export default function TokenUsage() {
   const fetchStats = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/token-usage/stats?period=${period}`)
+      // Add aggressive cache-busting
+      const cacheBuster = `&_t=${Date.now()}_${Math.random()}`
+      const response = await fetch(`/api/token-usage/stats?period=${period}${cacheBuster}`)
       const data = await response.json()
       
       if (data.success) {
@@ -30,7 +32,9 @@ export default function TokenUsage() {
   const fetchHistory = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/token-usage/history?limit=50')
+      // Add aggressive cache-busting
+      const cacheBuster = `&_t=${Date.now()}_${Math.random()}`
+      const response = await fetch(`/api/token-usage/history?period=${period}${cacheBuster}`)
       const data = await response.json()
       
       if (data.success) {
@@ -90,7 +94,7 @@ export default function TokenUsage() {
       )}
 
       {/* ตัวเลือกช่วงเวลา */}
-      <div style={{ marginBottom: '20px' }}>
+      <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
         <label style={{ marginRight: '10px' }}>ช่วงเวลา:</label>
         <select 
           value={period} 
@@ -101,6 +105,22 @@ export default function TokenUsage() {
           <option value="week">7 วัน</option>
           <option value="month">30 วัน</option>
         </select>
+        <button 
+          onClick={() => {
+            fetchStats()
+            fetchHistory()
+          }}
+          style={{ 
+            padding: '5px 10px', 
+            backgroundColor: '#007bff', 
+            color: 'white', 
+            border: 'none', 
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          🔄 รีเฟรช
+        </button>
       </div>
 
       {/* สถิติ */}
@@ -145,7 +165,7 @@ export default function TokenUsage() {
           }}>
             <h4 style={{ color: '#111827', marginBottom: '10px' }}>📄 ไฟล์ที่ประมวลผล</h4>
             <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '5px 0', color: '#111827' }}>
-              {formatNumber(stats.filesProcessed || 0)}
+              {formatNumber(stats.totalFilesProcessed || 0)}
             </p>
             <small style={{ color: '#4b5563', fontWeight: '500' }}>Files</small>
           </div>
@@ -158,9 +178,11 @@ export default function TokenUsage() {
           }}>
             <h4 style={{ color: '#111827', marginBottom: '10px' }}>💰 ค่าใช้จ่าย</h4>
             <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '5px 0', color: '#111827' }}>
-              ${formatNumber((stats.totalCost || 0).toFixed(4))}
+              ฿{formatNumber((stats.totalCostTHB || 0).toFixed(2))}
             </p>
-            <small style={{ color: '#4b5563', fontWeight: '500' }}>USD</small>
+            <small style={{ color: '#4b5563', fontWeight: '500' }}>
+              (${formatNumber((stats.totalCost || 0).toFixed(4))} USD)
+            </small>
           </div>
         </div>
       )}
@@ -181,20 +203,7 @@ export default function TokenUsage() {
         >
           🗑️ ลบ log เก่า (30 วัน)
         </button>
-        <button 
-          onClick={() => window.location.href = '/api/token-usage/report'}
-          style={{ 
-            padding: '8px 16px', 
-            backgroundColor: '#007bff', 
-            color: 'white', 
-            border: 'none', 
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          📄 ดาวน์โหลดรายงาน
-        </button>
-      </div>
+              </div>
 
       {/* ประวัติการใช้งานล่าสุด */}
       <div>
@@ -215,7 +224,7 @@ export default function TokenUsage() {
                   <th style={{ padding: '10px', textAlign: 'left', borderBottom: '1px solid #dee2e6', color: '#111827', fontWeight: '600' }}>ไฟล์</th>
                   <th style={{ padding: '10px', textAlign: 'left', borderBottom: '1px solid #dee2e6', color: '#111827', fontWeight: '600' }}>Input</th>
                   <th style={{ padding: '10px', textAlign: 'left', borderBottom: '1px solid #dee2e6', color: '#111827', fontWeight: '600' }}>Output</th>
-                  <th style={{ padding: '10px', textAlign: 'left', borderBottom: '1px solid #dee2e6', color: '#111827', fontWeight: '600' }}>ค่าใช้จ่าย</th>
+                  <th style={{ padding: '10px', textAlign: 'left', borderBottom: '1px solid #dee2e6', color: '#111827', fontWeight: '600' }}>ค่าใช้จ่าย (THB)</th>
                 </tr>
               </thead>
               <tbody>
@@ -227,7 +236,12 @@ export default function TokenUsage() {
                     <td style={{ padding: '10px' }}>{item.fileName}</td>
                     <td style={{ padding: '10px' }}>{formatNumber(item.inputTokens)}</td>
                     <td style={{ padding: '10px' }}>{formatNumber(item.outputTokens)}</td>
-                    <td style={{ padding: '10px' }}>${item.cost?.toFixed(6) || '0.000000'}</td>
+                    <td style={{ padding: '10px' }}>
+              ฿{(((item.inputTokens * 0.075 / 1000000) + (item.outputTokens * 0.30 / 1000000)) * 32).toFixed(4)}
+              <small style={{ color: '#666', fontSize: '11px' }}>
+                (${((item.inputTokens * 0.075 / 1000000) + (item.outputTokens * 0.30 / 1000000)).toFixed(6)})
+              </small>
+            </td>
                   </tr>
                 ))}
               </tbody>

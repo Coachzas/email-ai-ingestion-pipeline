@@ -7,8 +7,8 @@ const tokenUsageLogger = require('../utils/token-usage-logger');
  */
 router.get('/history', (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 50;
-    const history = tokenUsageLogger.getUsageHistory(limit);
+    const period = req.query.period || 'all';
+    const history = tokenUsageLogger.getUsageHistory(period);
     
     res.json({
       success: true,
@@ -28,7 +28,7 @@ router.get('/history', (req, res) => {
  */
 router.get('/stats', (req, res) => {
   try {
-    const period = req.query.period || 'today';
+    const period = req.query.period || 'all';
     const stats = tokenUsageLogger.getUsageStats(period);
     
     res.json({
@@ -43,23 +43,6 @@ router.get('/stats', (req, res) => {
   }
 });
 
-/**
- * Get token usage report
- */
-router.get('/report', (req, res) => {
-  try {
-    const period = req.query.period || 'today';
-    const report = tokenUsageLogger.generateReport(period);
-    
-    res.set('Content-Type', 'text/plain');
-    res.send(report);
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
 
 /**
  * Clean up old logs

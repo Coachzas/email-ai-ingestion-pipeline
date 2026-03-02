@@ -1,4 +1,3 @@
-const { processAttachmentsOCR } = require('../services/attachment-ocr.service');
 const { processBatchWithWorkers } = require('../utils/thread-pool');
 
 // Store active SSE connections
@@ -26,7 +25,7 @@ function broadcastProgress(progress) {
   });
 }
 
-async function processAttachmentsWithProgress(limit = 30) {
+async function processAttachmentsWithProgress(limit) {
   const originalLog = console.log;
   const originalError = console.error;
   
@@ -73,11 +72,13 @@ async function processAttachmentsWithProgress(limit = 30) {
   
   try {
     const prisma = require('../utils/prisma');
+
+    // ดึง attachment ที่ไม่ได้ประมวลผล (ใช้ ocrStatus เหมือนระบบหลัก)
     const attachments = await prisma.attachment.findMany({
       where: {
         OR: [
-          { extractedText: null },
-          { extractedText: '' }
+          { ocrStatus: null },
+          { ocrStatus: { not: 'COMPLETED' } }
         ]
       },
       take: typeof limit === 'number' ? limit : undefined,
@@ -156,8 +157,11 @@ async function getOcrProgress(req, res) {
   });
 }
 
-async function startOcrWithProgress(req, res, limit = 30) {
+async function startOcrWithProgress(req, res) {
   try {
+    const { limit = 30 } = req.body || {};
+    
+    // 1. ตรวจสอบว่า OCR กำลังประมวลผลอยู่หรือไม่
     if (ocrProgress.isProcessing) {
       return res.status(400).json({
         success: false,
@@ -165,6 +169,7 @@ async function startOcrWithProgress(req, res, limit = 30) {
       });
     }
 
+    // 2. ตั้งค่า OCR progress
     ocrProgress.isProcessing = true;
     ocrProgress.currentFile = 'กำลังเริ่มต้น...';
     broadcastProgress(ocrProgress);
@@ -175,6 +180,7 @@ async function startOcrWithProgress(req, res, limit = 30) {
       isProcessing: true
     });
 
+    // 3. เริ่ม OCR ใน background
     processAttachmentsWithProgress(limit)
       .then(result => {
         ocrProgress.isProcessing = false;
@@ -182,16 +188,15 @@ async function startOcrWithProgress(req, res, limit = 30) {
       })
       .catch(err => {
         ocrProgress.isProcessing = false;
-        ocrProgress.currentFile = '❌ เกิดข้อผิดพลาด';
         broadcastProgress(ocrProgress);
       });
 
-  } catch (err) {
+  } catch (error) {
     ocrProgress.isProcessing = false;
     res.status(500).json({
       success: false,
       message: 'Failed to start OCR processing',
-      error: err.message
+      error: error.message
     });
   }
 }

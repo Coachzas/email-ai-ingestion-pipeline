@@ -1,8 +1,7 @@
 import React from 'react'
 
 export default function EmailProgressIndicator({ 
-  isProcessing, 
-  progress, 
+  isProcessing,  
   currentEmail, 
   totalEmails, 
   processed, 

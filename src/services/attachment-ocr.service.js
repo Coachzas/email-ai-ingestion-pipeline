@@ -7,15 +7,11 @@ const prisma = require('../utils/prisma');
  */
 function sanitizeText(text) {
   if (!text) return '';
-  
   return text
-    // ลบ null bytes และ control characters
     .replace(/\x00/g, '')
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-    // แปลง newline ให้เป็นมาตรฐาน
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
-    // ลบช่องว่างซ้ำ
     .replace(/\n{3,}/g, '\n\n')
     .replace(/[ \t]+/g, ' ')
     .trim();
@@ -28,11 +24,8 @@ function sanitizeText(text) {
 async function extractTextFromPath(filePath, attachmentId = null) {
   const fs = require('fs');
   const path = require('path');
-  
   if (!fs.existsSync(filePath)) return '';
-  
   const ext = path.extname(filePath).toLowerCase();
-  
   switch (ext) {
     case '.jpg':
     case '.jpeg':
@@ -41,59 +34,47 @@ async function extractTextFromPath(filePath, attachmentId = null) {
     case '.tiff':
     case '.gif':
       try {
-        if (!fs.existsSync(filePath)) return '';
         const geminiService = new GeminiOcrService();
         const ocrResult = await geminiService.extractTextFromPath(filePath);
         return sanitizeText(ocrResult || '');
       } catch (ocrErr) {
         return '';
       }
-      
     case '.pdf':
       try {
-        if (!fs.existsSync(filePath)) return '';
         const pdfResult = await extractors.pdf(filePath, attachmentId);
         return sanitizeText(pdfResult || '');
       } catch (pdfErr) {
         return '';
       }
-      
     case '.csv':
       try {
-        if (!fs.existsSync(filePath)) return '';
         const csvResult = await extractors.csv(filePath);
         return sanitizeText(csvResult || '');
       } catch (csvErr) {
         return '';
       }
-      
     case '.docx':
       try {
-        if (!fs.existsSync(filePath)) return '';
         const docxResult = await extractors.docx(filePath);
         return sanitizeText(docxResult || '');
       } catch (docxErr) {
         return '';
       }
-      
     case '.xlsx':
       try {
-        if (!fs.existsSync(filePath)) return '';
         const xlsxResult = await extractors.xlsx(filePath);
         return sanitizeText(xlsxResult || '');
       } catch (xlsxErr) {
         return '';
       }
-      
     case '.pptx':
       try {
-        if (!fs.existsSync(filePath)) return '';
         const pptxResult = await extractors.pptx(filePath);
         return sanitizeText(pptxResult || '');
       } catch (pptxErr) {
         return '';
       }
-      
     default:
       return '';
   }
@@ -104,121 +85,30 @@ async function extractTextFromPath(filePath, attachmentId = null) {
  */
 async function extractText(file, attachmentId = null) {
   const { filePath, fileType } = file;
-
   try {
     if (fileType.startsWith('image/')) {
       const geminiService = new GeminiOcrService();
       return await geminiService.extractTextFromPath(filePath);
     }
-
     if (fileType === 'application/pdf') {
       return await extractors.pdf(filePath, attachmentId);
     }
-
     if (fileType === 'text/csv') {
       return await extractors.csv(filePath);
     }
-
     if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
       return await extractors.docx(filePath);
     }
-
     if (fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
       return await extractors.xlsx(filePath);
     }
-
     if (fileType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation') {
       return await extractors.pptx(filePath);
     }
-
     return '';
-    
   } catch (error) {
     return '';
   }
 }
 
-/**
- * Process attachments that don't have extractedText yet
- */
-async function processAttachmentsOCR(limit = 30) {
-  const attachments = await prisma.attachment.findMany({
-    where: {
-      // ดึงเฉพาะไฟล์ที่ยังไม่เคยทำ OCR สำเร็จ
-      NOT: {
-        ocrStatus: 'COMPLETED'
-      }
-    },
-    take: typeof limit === 'number' ? limit : undefined,
-  });
-
-  let processed = 0;
-  let errors = 0;
-  let skipped = 0;
-  const results = [];
-
-  for (const att of attachments) {
-    try {
-      const fs = require('fs');
-      if (!fs.existsSync(att.filePath)) {
-        results.push({ fileName: att.fileName, status: 'missing' });
-        errors++;
-        continue;
-      }
-
-      const stats = fs.statSync(att.filePath);
-      if (stats.size === 0) {
-        results.push({ fileName: att.fileName, status: 'skipped' });
-        skipped++;
-        continue;
-      }
-
-      const file = { filePath: att.filePath, fileType: att.fileType, originalName: att.fileName };
-      const extractPromise = extractText(file, att.id);
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout')), 30000)
-      );
-
-      let text = '';
-      try {
-        text = await Promise.race([extractPromise, timeoutPromise]);
-      } catch (timeoutErr) {
-        text = '';
-        errors++;
-      }
-
-      const hasText = text && text.trim().length > 0;
-      const sanitizedText = sanitizeText(text);
-      
-      // บังคับให้อัปเดต size และ ocrStatus เสมอ
-      const updateData = {
-        size: Number(stats.size), // บังคับเป็น Number
-        ocrStatus: 'COMPLETED'
-      };
-      
-      // อัปเดต extractedText เฉพาะเมื่อมีข้อความ
-      if (hasText) {
-        updateData.extractedText = sanitizedText;
-      } else {
-        // ใช้ null แทน undefined เพื่อบังคับอัปเดต
-        updateData.extractedText = null;
-      }
-      
-      await prisma.attachment.update({
-        where: { id: att.id },
-        data: updateData
-      });
-      
-      results.push({ fileName: att.fileName, status: hasText ? 'success' : 'no_text' });
-      
-      if (hasText) processed++; else skipped++;
-    } catch (err) {
-      results.push({ fileName: att.fileName, status: 'error' });
-      errors++;
-    }
-  }
-
-  return { total: attachments.length, processed, errors, skipped, results };
-}
-
-module.exports = { extractTextFromPath, processAttachmentsOCR };
+module.exports = { extractTextFromPath, sanitizeText };

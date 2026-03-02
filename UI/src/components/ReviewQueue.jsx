@@ -21,6 +21,7 @@ export default function ReviewQueue({ onOpenEmail }) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [ocrLimit, setOcrLimit] = useState(30)
   
   // Use real-time OCR progress
   const { progress, isConnected, startOcr } = useOcrProgress()
@@ -94,7 +95,7 @@ export default function ReviewQueue({ onOpenEmail }) {
     setError(null)
 
     try {
-      const result = await startOcr()
+      const result = await startOcr(ocrLimit)
       console.log('✅ OCR started:', result)
       
       // Auto-refresh when OCR completes
@@ -235,13 +236,27 @@ export default function ReviewQueue({ onOpenEmail }) {
           )}
         </div>
         <div className="review-header-actions">
+          <div className="ocr-limit-selector">
+            <select 
+              id="ocr-limit"
+              value={ocrLimit} 
+              onChange={(e) => setOcrLimit(Number(e.target.value))}
+              disabled={progress.isProcessing}
+              className="limit-select"
+            >
+              <option value={1}>1 ไฟล์ </option>
+              <option value={10}>10 ไฟล์ </option>
+              <option value={30}>30 ไฟล์ </option>
+              <option value={50}>50 ไฟล์ </option>
+            </select>
+          </div>
           <button 
             type="button" 
             className="primary-button" 
             onClick={handleOcrProcess} 
             disabled={progress.isProcessing || isLoading}
           >
-            {progress.isProcessing ? '⏳ กำลังดึงข้อความ...' : '🔍 ดึงข้อความจากไฟล์'}
+            {progress.isProcessing ? '⏳ กำลังดึงข้อความ...' : `🔍 ดึงข้อความ (${ocrLimit} ไฟล์)`}
           </button>
           <button type="button" className="secondary-button" onClick={fetchItems} disabled={isLoading}>
             🔄 รีเฟรช
@@ -668,6 +683,52 @@ export default function ReviewQueue({ onOpenEmail }) {
         .delete-button.small {
           padding: 4px 8px;
           font-size: 11px;
+        }
+
+        .ocr-limit-selector {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .ocr-limit-selector label {
+          font-size: 14px;
+          color: #fff;
+          font-weight: 500;
+        }
+
+        .limit-select {
+          padding: 6px 12px;
+          border: 1px solid #333;
+          border-radius: 4px;
+          background: #111;
+          color: #fff;
+          font-size: 14px;
+          cursor: pointer;
+          transition: border-color 0.2s;
+        }
+
+        .limit-select:hover {
+          border-color: #007bff;
+        }
+
+        .limit-select:focus {
+          outline: none;
+          border-color: #007bff;
+          box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }
+
+        .limit-select:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .review-header-actions {
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
         }
       `}</style>
     </>

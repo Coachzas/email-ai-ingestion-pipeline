@@ -50,10 +50,10 @@ class TokenUsageLogger {
 
   /**
    * อ่านประวัติการใช้ Token ทั้งหมด
-   * @param {number} limit - จำนวนรายการล่าสุดที่ต้องการ
+   * @param {string} period - ระยะเวลา: 'today', 'week', 'month', 'all'
    * @returns {Array} - รายการประวัติการใช้ Token
    */
-  getUsageHistory(limit = 50) {
+  getUsageHistory(period = 'all') {
     try {
       if (!fs.existsSync(this.logFile)) {
         return [];
@@ -70,8 +70,27 @@ class TokenUsageLogger {
         }
       }).filter(log => log !== null);
 
-      // เรียงจากล่าสุดและจำกัดจำนวน
-      return logs.reverse().slice(0, limit);
+      // กรองตามช่วงเวลา
+      let filteredLogs = logs;
+      const now = new Date();
+      
+      if (period === 'today') {
+        // ใช้ UTC time เพื่อให้ตรงกับ timestamp ใน log
+        const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+        filteredLogs = logs.filter(log => {
+          const logDate = new Date(log.timestamp);
+          return logDate >= todayUTC;
+        });
+      } else if (period === 'week') {
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        filteredLogs = logs.filter(log => new Date(log.timestamp) >= weekAgo);
+      } else if (period === 'month') {
+        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        filteredLogs = logs.filter(log => new Date(log.timestamp) >= monthAgo);
+      }
+
+      // เรียงจากล่าสุด (ไม่จำกัดจำนวน)
+      return filteredLogs.reverse();
     } catch (error) {
       console.warn('⚠️ Failed to read usage history:', error.message);
       return [];
@@ -84,23 +103,9 @@ class TokenUsageLogger {
    * @returns {Object} - สถิติการใช้ Token
    */
   getUsageStats(period = 'all') {
-    const logs = this.getUsageHistory(1000); // ดึงข้อมูลมากๆ สำหรับคำนวณ
-    const now = new Date();
+    const logs = this.getUsageHistory(period); // ดึงข้อมูลทั้งหมดตามช่วงเวลา
     
-    let filteredLogs = logs;
-    
-    if (period === 'today') {
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      filteredLogs = logs.filter(log => new Date(log.timestamp) >= today);
-    } else if (period === 'week') {
-      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      filteredLogs = logs.filter(log => new Date(log.timestamp) >= weekAgo);
-    } else if (period === 'month') {
-      const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      filteredLogs = logs.filter(log => new Date(log.timestamp) >= monthAgo);
-    }
-
-    if (filteredLogs.length === 0) {
+    if (logs.length === 0) {
       return {
         totalRequests: 0,
         totalInputTokens: 0,
@@ -108,24 +113,36 @@ class TokenUsageLogger {
         totalTokens: 0,
         averageTokensPerRequest: 0,
         totalFilesProcessed: 0,
+        totalCost: 0,
         period
       };
     }
 
     const stats = {
-      totalRequests: filteredLogs.length,
-      totalInputTokens: filteredLogs.reduce((sum, log) => sum + (log.inputTokens || 0), 0),
-      totalOutputTokens: filteredLogs.reduce((sum, log) => sum + (log.outputTokens || 0), 0),
-      totalFilesProcessed: filteredLogs.length,
+      totalRequests: logs.length,
+      totalInputTokens: logs.reduce((sum, log) => sum + (log.inputTokens || 0), 0),
+      totalOutputTokens: logs.reduce((sum, log) => sum + (log.outputTokens || 0), 0),
+      totalFilesProcessed: logs.length,
       period
     };
 
     stats.totalTokens = stats.totalInputTokens + stats.totalOutputTokens;
     stats.averageTokensPerRequest = Math.round(stats.totalTokens / stats.totalRequests);
+    
+    // คำนวณค่าใช้จ่าย (Gemini 2.0 Flash pricing: $0.075/1M input tokens, $0.30/1M output tokens)
+    const inputCostPerMillion = 0.075;
+    const outputCostPerMillion = 0.30;
+    const exchangeRate = 32; // 32 THB per USD
+    
+    const costUSD = (stats.totalInputTokens / 1000000) * inputCostPerMillion + 
+                   (stats.totalOutputTokens / 1000000) * outputCostPerMillion;
+    
+    stats.totalCost = costUSD;
+    stats.totalCostTHB = costUSD * exchangeRate;
 
     // จัดกลุ่มตามประเภทไฟล์
     stats.byFileType = {};
-    filteredLogs.forEach(log => {
+    logs.forEach(log => {
       const type = log.fileType || 'unknown';
       if (!stats.byFileType[type]) {
         stats.byFileType[type] = {

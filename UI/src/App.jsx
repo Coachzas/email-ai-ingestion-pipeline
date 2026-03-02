@@ -10,7 +10,6 @@ import TokenUsage from './components/TokenUsage.jsx'
 import { useEmailPipeline } from './hooks/useEmailPipeline'
 
 // Lazy load components
-const EmailDetails = lazy(() => import('./components/EmailDetails.jsx'))
 
 export default function App() {
   const [reviewEmailId, setReviewEmailId] = useState(null)
@@ -22,8 +21,6 @@ export default function App() {
     isLoading,
     log,
     error,
-    lastFetchedEmails,
-    showEmailDetails,
     previewEmails,
     showEmailSelection,
     emailProgress,
@@ -32,10 +29,7 @@ export default function App() {
     fetchEmailsPreview,
     saveSelectedEmails,
     clearError,
-    showEmailDetailsModal,
-    hideEmailDetailsModal,
-    hideEmailSelectionModal,
-    resetState
+    hideEmailSelectionModal
   } = useEmailPipeline()
 
   const handleStartDateChange = (e) => {
@@ -206,15 +200,6 @@ export default function App() {
               />
 
               <ReviewQueue onOpenEmail={openReviewEmail} />
-
-              {showEmailDetails && lastFetchedEmails && (
-                <Suspense fallback={<div className="modal-loading"><LoadingSpinner message="กำลังโหลด..." /></div>}>
-                  <EmailDetails 
-                    emails={lastFetchedEmails.emails}
-                    onClose={hideEmailDetailsModal}
-                  />
-                </Suspense>
-              )}
 
               {showEmailSelection && previewEmails && (
                 <Suspense fallback={<div className="modal-loading"><LoadingSpinner message="กำลังโหลด..." /></div>}>

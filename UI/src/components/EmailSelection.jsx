@@ -94,6 +94,12 @@ const EmailSelection = ({
           <div className="selection-info">
             <span>พบอีเมล {emails.length} ฉบับ</span>
             <span>เลือกแล้ว {selectedEmails.size} ฉบับ</span>
+            <br />
+            <span>ไฟล์แนบทั้งหมด {emails.reduce((sum, email) => sum + (email.attachmentCount || 0), 0)} ไฟล์</span>
+            <span>เลือกแล้ว {Array.from(selectedEmails).reduce((sum, tempId) => {
+              const email = emails.find(e => e.tempId === tempId);
+              return sum + (email?.attachmentCount || 0);
+            }, 0)} ไฟล์</span>
           </div>
 
           <div className="email-selection-controls">

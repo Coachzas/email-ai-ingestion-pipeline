@@ -5,7 +5,6 @@ const tokenUsageController = require('../controllers/token-usage.controller');
 // Token usage routes
 router.get('/history', tokenUsageController);
 router.get('/stats', tokenUsageController);
-router.get('/report', tokenUsageController);
 router.post('/cleanup', tokenUsageController);
 
 module.exports = router;

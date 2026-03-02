@@ -54,13 +54,11 @@ const pdfExtractor = async (filePath, attachmentId = null) => {
     // --- Method 2: Direct Gemini OCR ---
     const result = await extractTextFromBuffer(dataBuffer, 'application/pdf');
     
-    // Remove status update to avoid conflicts
-    // if (attachmentId) await updateAttachmentStatus(attachmentId, 'COMPLETED');
+    if (attachmentId) await updateAttachmentStatus(attachmentId, 'COMPLETED');
     return result;
 
   } catch (err) {
-    // Remove status update to avoid conflicts
-    // if (attachmentId) await updateAttachmentStatus(attachmentId, 'ERROR');
+    if (attachmentId) await updateAttachmentStatus(attachmentId, 'ERROR');
     return '';
   }
 };
