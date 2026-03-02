@@ -143,16 +143,13 @@ export const useEmailPipeline = () => {
         ...prev,
         isLoading: false,
         showEmailSelection: false,
-        previewEmails: null,
+        // Keep previewEmails for AI analyzer
         log: `${prev.log}${data.message}\n` +
-            `✅ บันทึกอีเมล ${data.savedCount || 0} ฉบับเสร็จแล้ว\n` +
-            `⏭️ ข้าม ${data.skippedCount || 0} ฉบับที่ซ้ำ\n` +
-            `📎 บันทึกไฟล์แนบ ${data.attachmentSavedCount || 0} ไฟล์ (ข้าม ${data.attachmentSkippedCount || 0} ไฟล์)\n`
+            `✅ บันทึกอีเมล ${data.saved || 0} ฉบับเสร็จแล้ว\n` +
+            `📎 บันทึกไฟล์แนบ ${data.attachmentStats?.saved || 0} ไฟล์\n`
       }))
       
-      if (typeof window !== 'undefined' && window.location) {
-        window.location.reload()
-      }
+      // Removed auto-reload to keep previewEmails for AI analyzer
     } catch (err) {
       setState(prev => ({
         ...prev,

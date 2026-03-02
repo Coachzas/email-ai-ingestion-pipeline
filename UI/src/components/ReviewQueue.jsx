@@ -16,7 +16,7 @@ const formatDate = (dateString) => {
   }
 }
 
-export default function ReviewQueue({ onOpenEmail }) {
+export default function ReviewQueue({ onOpenEmail, onOpenAiAnalyzer, onItemsChange }) {
   const [items, setItems] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -82,14 +82,17 @@ export default function ReviewQueue({ onOpenEmail }) {
       if (!response.ok) throw new Error('Failed to fetch review emails')
 
       const data = await response.json()
-      setItems(Array.isArray(data.items) ? data.items : [])
+      const newItems = Array.isArray(data.items) ? data.items : []
+      setItems(newItems)
+      onItemsChange?.(newItems) // Pass items to parent
     } catch (err) {
       setError(err)
       setItems([])
+      onItemsChange?.([]) // Pass empty array to parent
     } finally {
       setIsLoading(false)
     }
-  }, [queryString])
+  }, [queryString, onItemsChange])
 
   const handleOcrProcess = async () => {
     setError(null)
@@ -258,8 +261,14 @@ export default function ReviewQueue({ onOpenEmail }) {
           >
             {progress.isProcessing ? '⏳ กำลังดึงข้อความ...' : `🔍 ดึงข้อความ (${ocrLimit} ไฟล์)`}
           </button>
-          <button type="button" className="secondary-button" onClick={fetchItems} disabled={isLoading}>
-            🔄 รีเฟรช
+          <button 
+            type="button" 
+            className="ai-analyzer-button" 
+            onClick={onOpenAiAnalyzer}
+            disabled={items.length === 0}
+            title="วิเคราะห์ Resume ด้วย AI"
+          >
+            🤖 AI Resume Analyzer
           </button>
           <button 
             type="button" 
@@ -269,6 +278,9 @@ export default function ReviewQueue({ onOpenEmail }) {
             title="ลบอีเมลทั้งหมด"
           >
             🗑️ ลบทั้งหมด
+          </button>
+          <button type="button" className="secondary-button" onClick={fetchItems} disabled={isLoading}>
+            🔄 รีเฟรช
           </button>
         </div>
       </div>

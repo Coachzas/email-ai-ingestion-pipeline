@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, lazy, Suspense, useState } from 'react'
+import React, { useMemo, useEffect, lazy, Suspense, useState, useCallback } from 'react'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import LoadingSpinner from './components/LoadingSpinner.jsx'
 import EmailSelection from './components/EmailSelection.jsx'
@@ -7,13 +7,22 @@ import ReviewEmailModal from './components/ReviewEmailModal.jsx'
 import EmailProgressIndicator from './components/EmailProgressIndicator.jsx'
 import AccountManager from './components/AccountManager.jsx'
 import TokenUsage from './components/TokenUsage.jsx'
+import AiResumeAnalyzer from './components/AiResumeAnalyzer.jsx'
+import AiAnalysisProgress from './components/AiAnalysisProgress.jsx'
+import AiAnalysisResults from './components/AiAnalysisResults.jsx'
 import { useEmailPipeline } from './hooks/useEmailPipeline'
+import { useAiAnalyzer } from './hooks/useAiAnalyzer'
 
 // Lazy load components
 
 export default function App() {
+  console.log('App component rendering...');
+  
   const [reviewEmailId, setReviewEmailId] = useState(null)
   const [currentView, setCurrentView] = useState('pipeline') // 'pipeline', 'accounts', or 'tokens'
+  const [reviewQueueItems, setReviewQueueItems] = useState([])
+
+  try {
 
   const {
     startDate,
@@ -32,6 +41,21 @@ export default function App() {
     hideEmailSelectionModal
   } = useEmailPipeline()
 
+  const {showAiAnalyzer,
+    openAiAnalyzer,
+    closeAiAnalyzer,
+    analysisProgress,
+    startAnalysis,
+    analysisResults,
+    showResults,
+    closeResults
+  } = useAiAnalyzer()
+
+  // Debug previewEmails
+  console.log('App render - previewEmails:', previewEmails);
+  console.log('App render - previewEmails length:', previewEmails?.length);
+  console.log('App render - button disabled:', !previewEmails || previewEmails.length === 0);
+
   const handleStartDateChange = (e) => {
     setStartDate(e.target.value)
   }
@@ -39,6 +63,10 @@ export default function App() {
   const handleEndDateChange = (e) => {
     setEndDate(e.target.value)
   }
+
+  const handleReviewQueueItems = useCallback((items) => {
+    setReviewQueueItems(items)
+  }, [])
 
   const isFormValid = useMemo(() => {
     return Boolean(startDate || endDate)
@@ -116,41 +144,41 @@ export default function App() {
             <p style={{ color: '#ccc', marginBottom: '20px' }}>เลือกช่วงวันที่เพื่อดึงอีเมลจาก IMAP</p>
           )}
 
-          {error && (
-            <div 
-              className="error-message" 
-              role="alert" 
-              aria-live="polite"
-              id="error-message"
-              style={{ 
-                backgroundColor: '#dc3545', 
-                color: '#fff', 
-                padding: '10px', 
-                borderRadius: '4px', 
-                marginBottom: '20px' 
-              }}
-            >
-              <span>❌ {error.message}</span>
-              <button 
-                onClick={clearError} 
-                className="close-error"
-                aria-label="ปิดข้อความแจ้งข้อผิดพลาด"
-                style={{ 
-                  background: 'none', 
-                  border: 'none', 
-                  color: '#fff', 
-                  fontSize: '18px', 
-                  cursor: 'pointer',
-                  marginLeft: '10px'
-                }}
-              >
-                ×
-              </button>
-            </div>
-          )}
-
           {currentView === 'pipeline' && (
             <>
+              {error && (
+                <div 
+                  className="error-message" 
+                  role="alert" 
+                  aria-live="polite"
+                  id="error-message"
+                  style={{ 
+                    backgroundColor: '#dc3545', 
+                    color: '#fff', 
+                    padding: '10px', 
+                    borderRadius: '4px', 
+                    marginBottom: '20px' 
+                  }}
+                >
+                  <span>❌ {error.message}</span>
+                  <button 
+                    onClick={clearError} 
+                    className="close-error"
+                    aria-label="ปิดข้อความแจ้งข้อผิดพลาด"
+                    style={{ 
+                      background: 'none', 
+                      border: 'none', 
+                      color: '#fff', 
+                      fontSize: '18px', 
+                      cursor: 'pointer',
+                      marginLeft: '10px'
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+
               <form className="controls" onSubmit={(e) => { e.preventDefault(); fetchEmailsPreview(); }}>
                 <label>
                   วันที่เริ่มต้น
@@ -199,7 +227,7 @@ export default function App() {
                 errors={emailProgress.errors}
               />
 
-              <ReviewQueue onOpenEmail={openReviewEmail} />
+              <ReviewQueue onOpenEmail={openReviewEmail} onOpenAiAnalyzer={openAiAnalyzer} onItemsChange={handleReviewQueueItems} />
 
               {showEmailSelection && previewEmails && (
                 <Suspense fallback={<div className="modal-loading"><LoadingSpinner message="กำลังโหลด..." /></div>}>
@@ -210,6 +238,16 @@ export default function App() {
                     onSaveSelected={saveSelectedEmails}
                   />
                 </Suspense>
+              )}
+
+              {/* AI Resume Analyzer Modal */}
+              {showAiAnalyzer && (
+                <AiResumeAnalyzer
+                  isOpen={showAiAnalyzer}
+                  onClose={closeAiAnalyzer}
+                  items={reviewQueueItems}
+                  onAnalyze={startAnalysis}
+                />
               )}
             </>
           )}
@@ -225,10 +263,26 @@ export default function App() {
           {reviewEmailId && (
             <ReviewEmailModal emailId={reviewEmailId} onClose={closeReviewEmail} />
           )}
+
+          {/* AI Analysis Progress Modal */}
+          {analysisProgress.isProcessing && (
+            <AiAnalysisProgress 
+              analysisProgress={analysisProgress}
+            />
+          )}
+
+          {/* AI Analysis Results Modal */}
+          {showResults && analysisResults && (
+            <AiAnalysisResults 
+              results={analysisResults}
+              onClose={closeResults}
+            />
+          )}
+        
         </div>
-      </div>  
+        </div>
           
-      <style jsx>{`
+        <style jsx>{`
         body {
           margin: 0;
           padding: 0;
@@ -273,7 +327,51 @@ export default function App() {
           border-color: #007bff;
           box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
         }
+
+        .ai-analyzer-section {
+          margin: 20px 0 !important;
+          text-align: center !important;
+          width: 100% !important;
+          display: block !important;
+          clear: both !important;
+        }
+
+        .ai-analyzer-btn {
+          padding: 10px 20px !important;
+          background: #007bff !important;
+          color: white !important;
+          border: none !important;
+          border-radius: 4px !important;
+          cursor: pointer !important;
+          font-size: 14px !important;
+          margin: 10px auto !important;
+          transition: all 0.2s ease !important;
+          display: inline-block !important;
+          position: relative !important;
+          float: none !important;
+          left: auto !important;
+          right: auto !important;
+        }
+
+        .ai-analyzer-btn:hover:not(:disabled) {
+          background: #0056b3;
+        }
+
+        .ai-analyzer-btn:disabled {
+          background: #666;
+          cursor: not-allowed;
+        }
       `}</style>
     </ErrorBoundary>
   )
+  } catch (error) {
+    console.error('App component error:', error);
+    return (
+      <div style={{ padding: '20px', color: 'red' }}>
+        <h2>Something went wrong</h2>
+        <p>{error.message}</p>
+        <pre>{error.stack}</pre>
+      </div>
+    );
+  }
 }
