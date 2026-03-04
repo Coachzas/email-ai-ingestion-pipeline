@@ -5,6 +5,9 @@ const batchSchedulerController = require('../controllers/batchScheduler.controll
 // POST /api/batch-schedulers - สร้าง scheduler ใหม่
 router.post('/', batchSchedulerController.createScheduler);
 
+// PUT /api/batch-schedulers/:id - อัปเดต scheduler
+router.put('/:id', batchSchedulerController.updateScheduler);
+
 // GET /api/batch-schedulers - ดึง schedulers ทั้งหมด
 router.get('/', batchSchedulerController.getAllSchedulers);
 
@@ -16,6 +19,9 @@ router.post('/test-imap', batchSchedulerController.testImapConnection);
 
 // POST /api/batch-schedulers/:id/run-now - สั่งรัน scheduler ทันที
 router.post('/:id/run-now', batchSchedulerController.runSchedulerNow);
+
+// POST /api/batch-schedulers/:id/set-active - ตั้งค่า Active Scheduler เดียว
+router.post('/:id/set-active', batchSchedulerController.setActiveScheduler);
 
 // DELETE /api/batch-schedulers/:id - ลบ scheduler
 router.delete('/:id', batchSchedulerController.deleteScheduler);

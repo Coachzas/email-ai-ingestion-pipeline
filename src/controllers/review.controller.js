@@ -249,17 +249,11 @@ async function deleteAllEmails(req, res) {
   try {
     const accountId = req.user?.id || req.account?.id || req.body?.accountId || req.query?.accountId;
     
-    if (!accountId) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Account ID required to delete emails'
-      });
-    }
+    // If no accountId provided, delete all emails (for backward compatibility)
+    const whereClause = accountId ? { accountId: accountId } : {};
     
     const emails = await prisma.email.findMany({
-      where: {
-        accountId: accountId
-      },
+      where: whereClause,
       include: {
         attachments: true
       }
@@ -309,17 +303,11 @@ async function deleteAllEmails(req, res) {
     }
 
     const attachmentsResult = await prisma.attachment.deleteMany({
-      where: {
-        email: {
-          accountId: accountId
-        }
-      }
+      where: whereClause
     });
 
     const emailsResult = await prisma.email.deleteMany({
-      where: {
-        accountId: accountId
-      }
+      where: whereClause
     });
 
     res.json({

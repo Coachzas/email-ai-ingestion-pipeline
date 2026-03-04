@@ -15,9 +15,9 @@ model Email {
   bodyText    String?
   receivedAt  DateTime
   createdAt   DateTime     @default(now())
-  accountId   String
+  accountId   String?
   attachments Attachment[]
-  account     EmailAccount @relation(fields: [accountId], references: [id])
+  account     EmailAccount? @relation(fields: [accountId], references: [id])
 }
 
 model EmailAccount {

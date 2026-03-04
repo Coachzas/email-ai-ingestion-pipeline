@@ -111,4 +111,119 @@ async function extractText(file, attachmentId = null) {
   }
 }
 
-module.exports = { extractTextFromPath, sanitizeText };
+/**
+ * Process OCR for new emails (attachments that haven't been processed yet)
+ */
+async function processAttachmentsForNewEmails() {
+  try {
+    const prisma = require('../utils/prisma');
+    
+    // ดึง attachments ที่ยังไม่ได้ประมวลผล OCR
+    const attachments = await prisma.attachment.findMany({
+      where: {
+        OR: [
+          { ocrStatus: null },
+          { ocrStatus: { not: 'COMPLETED' } }
+        ]
+      },
+      include: {
+        email: {
+          select: {
+            id: true,
+            subject: true,
+            receivedAt: true
+          }
+        }
+      }
+    });
+
+    console.log(`🔍 Found ${attachments.length} attachments to process for OCR`);
+
+    if (attachments.length === 0) {
+      return {
+        success: true,
+        processed: 0,
+        errors: 0,
+        message: 'No attachments to process'
+      };
+    }
+
+    let processed = 0;
+    let errors = 0;
+
+    for (const attachment of attachments) {
+      try {
+        const fs = require('fs');
+        if (!fs.existsSync(attachment.filePath)) {
+          console.log(`⚠️ File not found: ${attachment.filePath}`);
+          await prisma.attachment.update({
+            where: { id: attachment.id },
+            data: { ocrStatus: 'FAILED' }
+          });
+          errors++;
+          continue;
+        }
+
+        // อัปเดตสถานะเป็นกำลังประมวลผล
+        await prisma.attachment.update({
+          where: { id: attachment.id },
+          data: { ocrStatus: 'PROCESSING' }
+        });
+
+        const extractedText = await extractTextFromPath(attachment.filePath, attachment.id);
+        
+        // ถ้า extractedText ว่าง ให้ถือว่าเสร็จแต่ไม่มีข้อความ
+        await prisma.attachment.update({
+          where: { id: attachment.id },
+          data: {
+            extractedText: extractedText || null,
+            ocrStatus: 'COMPLETED'
+          }
+        });
+
+        console.log(`✅ OCR completed for ${attachment.fileName} (Email: ${attachment.email.subject})`);
+        processed++;
+
+        // Update progress tracking
+        if (global.batchProgressUpdate) {
+          global.batchProgressUpdate({
+            processedAttachments: processed,
+            totalAttachments: attachments.length
+          });
+        }
+
+      } catch (error) {
+        console.error(`❌ OCR failed for ${attachment.fileName}:`, error.message);
+        await prisma.attachment.update({
+          where: { id: attachment.id },
+          data: {
+            ocrStatus: 'FAILED'
+          }
+        });
+        errors++;
+      }
+    }
+
+    return {
+      success: true,
+      processed,
+      errors,
+      message: `Processed ${processed} attachments, ${errors} errors`
+    };
+
+  } catch (error) {
+    console.error('❌ processAttachmentsForNewEmails failed:', error);
+    return {
+      success: false,
+      processed: 0,
+      errors: 0,
+      message: error.message
+    };
+  }
+}
+
+module.exports = { 
+  extractTextFromPath, 
+  sanitizeText,
+  processAttachmentsForNewEmails
+};

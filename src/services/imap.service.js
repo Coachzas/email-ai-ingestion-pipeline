@@ -5,7 +5,7 @@ const path = require("path");
 const prisma = require("../utils/prisma");
 
 //ฟังก์ชันสำหรับเชื่อมต่อและดึงข้อมูลอีเมล ผ่านไลบรารีที่ชื่อว่า Imapflow
-async function fetchEmails(startDate, endDate, previewMode = false, accountConfig = null, options = {}) {
+async function fetchEmails(startDate, endDate, accountConfig = null, options = {}) {
   const config = accountConfig || {
     host: process.env.IMAP_HOST,
     port: process.env.IMAP_PORT,
@@ -36,7 +36,7 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
     await client.mailboxOpen("INBOX");
 
     let searchQuery = { all: true };
-    log(`📧 fetchEmails params: startDate=${startDate || '-'} endDate=${endDate || '-'} previewMode=${previewMode}`);
+    log(`📧 fetchEmails params: startDate=${startDate || '-'} endDate=${endDate || '-'}`);
     if (startDate || endDate) {
       searchQuery = {};
       if (startDate) {
@@ -74,92 +74,6 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
     const lastUids = uidArray;
 
     log(`📧 IMAP search result UIDs: ${lastUids.length}`);
-
-    // ถ้าเป็น preview mode ให้กรองเฉพาะอีเมลที่ยังไม่ได้บันทึก
-    if (previewMode) {
-      // ตรวจสอบ UID ที่เคยบันทึกแล้ว
-      const existingUids = await prisma.email.findMany({
-        where: { imapUid: { in: lastUids } },
-        select: { imapUid: true },
-      });
-      const existingUidSet = new Set(existingUids.map((e) => e.imapUid));
-      const newUids = lastUids.filter((uid) => !existingUidSet.has(uid));
-
-      const previewEmails = [];
-      for (const uid of newUids) {
-        try {
-          const msg = await client.fetchOne(uid, {
-            envelope: true,     // หัวข้อ, ผู้ส่ง, วันที่
-            bodyStructure: true, // ✅ โครงสร้าง + จำนวนไฟล์แนบ
-            uid: true,
-            flags: true,
-            size: true
-          });
-
-          // --- เพิ่มส่วนตะแกรงร่อนตรงนี้ ---
-          const receivedAt = msg.envelope.date ? new Date(msg.envelope.date) : new Date();
-          if (startDate || endDate) {
-            const startFilter = startDate ? new Date(startDate) : null;
-            const endFilter = endDate ? new Date(endDate) : null;
-            if (startFilter) startFilter.setHours(0, 0, 0, 0);
-            if (endFilter) endFilter.setHours(23, 59, 59, 999);
-
-            if (
-              (startFilter && receivedAt < startFilter) ||
-              (endFilter && receivedAt > endFilter)
-            )
-              continue;
-          }
-
-          // แปลง bodyStructure เป็นข้อมูลไฟล์แนบ (ไม่โหลดตัวไฟล์จริง)
-          const attachments = [];
-          if (msg.bodyStructure) {
-            const extractAttachments = (parts) => {
-              if (!parts) return;
-              
-              // ถ้าเป็น array ให้วนลูปแต่ละ element
-              if (Array.isArray(parts)) {
-                parts.forEach(part => extractAttachments(part));
-                return;
-              }
-              
-              // ถ้าเป็น object ที่มี childNodes ให้วนลูป childNodes ก่อน
-              if (parts.childNodes) {
-                parts.childNodes.forEach(child => extractAttachments(child));
-              }
-              
-              // ถ้าเป็น object ที่มี parts ให้วนลูป parts
-              if (parts.parts) {
-                parts.parts.forEach(part => extractAttachments(part));
-              }
-              
-              // ตรวจสอบว่าเป็น attachment หรือไม่
-              if (parts.disposition === 'attachment') {
-                attachments.push({
-                  filename: parts.dispositionParameters?.filename || parts.parameters?.name || 'unknown',
-                  contentType: parts.type || 'application/octet-stream',
-                  size: parts.size || 0,
-                  hasContent: false // Preview ไม่มีตัวไฟล์จริง
-                });
-              }
-            };
-            extractAttachments(msg.bodyStructure);
-          }
-
-          previewEmails.push({
-            imapUid: uid,
-            from: msg.envelope.from?.text || "Unknown",
-            subject: msg.envelope.subject || "No Subject",
-            date: receivedAt,
-            text: null,  // Preview ไม่ต้องการเนื้อหา
-            html: null,   // Preview ไม่ต้องการ HTML
-            attachments: attachments, // ✅ ข้อมูลไฟล์แนบ (ไม่มีตัวไฟล์จริง)
-            size: msg.size || 0,
-          });
-        } catch (msgErr) {}
-      }
-      return previewEmails;
-    }
 
     // ดึงอีเมลทีละฉบับตาม UID ที่ได้มา (normal mode)
     const uidsToFetch = limit !== null ? lastUids.slice(0, limit) : lastUids;
@@ -202,7 +116,7 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
             subject: parsed.subject || "",
             bodyText: parsed.text || "",
             receivedAt: parsed.date || new Date(),
-            accountId: accountConfig?.id || null,
+            accountId: accountConfig?.id,
           },
         });
 

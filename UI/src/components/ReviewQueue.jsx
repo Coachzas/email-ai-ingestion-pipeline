@@ -1,8 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 
-import OcrProgressIndicator from './OcrProgressIndicator.jsx'
-
-import { useOcrProgress } from '../hooks/useOcrProgress.js'
+import { useBatchProgress } from '../hooks/useBatchProgress.js'
 
 
 
@@ -47,9 +45,8 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
   
   
 
-  // Use real-time OCR progress
-
-  const { progress, isConnected, startOcr } = useOcrProgress()
+  // Use batch progress
+  const { isProcessing, currentPhase, getPhaseText } = useBatchProgress()
 
 
 
@@ -184,48 +181,31 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
 
 
   const handleOcrProcess = async () => {
-
     setError(null)
 
-
-
     try {
-
-      const result = await startOcr(1000) // ใช้ค่าสูงๆ เพื่อประมวลผลทั้งหมด
-
-      console.log('✅ OCR started:', result)
-
+      // OCR is now part of batch process, no manual start needed
+      console.log('ℹ️ OCR is handled automatically by batch scheduler')
       
-
-      // Auto-refresh when OCR completes
-
+      // Auto-refresh when batch completes
       const checkInterval = setInterval(() => {
-
-        if (!progress.isProcessing) {
-
+        if (!isProcessing) {
           clearInterval(checkInterval)
-
+          setRefreshTrigger(prev => prev + 1)
           fetchItems()
-
         }
-
       }, 2000)
 
-      
+      return { success: true, message: 'OCR runs automatically with batch scheduler' }
 
     } catch (err) {
-
       setError(err)
-
     }
-
   }
-
-
 
   const handleDeleteAllEmails = async () => {
 
-    if (!window.confirm('⚠️ ยืนยันการลบอีเมลทั้งหมด?\n\nการกระทำนี้จะลบ:\n• ข้อมูลอีเมลทั้งหมดของบัญชีปัจจุบัน\n• ไฟล์แนบทั้งหมดใน storage\n• ไม่สามารถกู้คืนได้')) {
+    if (!window.confirm('⚠️ ยืนยันการลบอีเมลทั้งหมด?\n\nการกระทำนี้จะลบ:\n• ข้อมูลอีเมลทั้งหมดในระบบ\n• ไฟล์แนบทั้งหมดใน storage\n• ไม่สามารถกู้คืนได้')) {
 
       return
 
@@ -242,21 +222,11 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
     try {
 
       const response = await fetch('/api/review/emails', {
-
         method: 'DELETE',
-
         headers: {
-
           'Content-Type': 'application/json'
-
         },
-
-        body: JSON.stringify({
-
-          accountId: currentAccount?.id
-
-        })
-
+        body: JSON.stringify({})
       })
 
 
@@ -451,193 +421,99 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
 
     <>
 
-      <OcrProgressIndicator
-
-        isProcessing={progress.isProcessing}
-
-        currentFile={progress.currentFile}
-
-        totalFiles={progress.totalFiles}
-
-        processed={progress.processed}
-
-        errors={progress.errors}
-
-      />
-
-      
+      {isProcessing && (
+        <div className="batch-progress-indicator">
+          <div className="batch-progress-content">
+            <div className="batch-progress-spinner"></div>
+            <span className="batch-progress-text">🔄 {getPhaseText()}</span>
+          </div>
+        </div>
+      )}
 
       <section className="review-section">
-
-      <div className="review-header">
-
-        <div>
-
-          <h2>📝 Email Review Center</h2>
-
-          <p>รายการอีเมลที่บันทึกแล้วสำหรับ HR Review</p>
-
-          {isConnected && (
-
-            <p className="connection-status">🟢 Real-time updates connected</p>
-
-          )}
-
-        </div>
-
-        
+        <div className="review-header">
+          <div>
+            <h2>📝 Email Review Center</h2>
+            <p>รายการอีเมลที่บันทึกแล้วสำหรับ HR Review</p>
+          </div>
+          
           <div className="review-header-actions">
-          <button 
-
-            type="button" 
-
-            className="danger-button" 
-
-            onClick={handleDeleteAllEmails} 
-
-            disabled={isLoading || items.length === 0}
-
-            title="ลบอีเมลทั้งหมด"
-
-          >
-
-            🗑️ ลบทั้งหมด
-
-          </button>
-
-          <button type="button" className="secondary-button" onClick={fetchItems} disabled={isLoading}>
-
-            🔄 รีเฟรช
-
-          </button>
-
+            <button 
+              type="button" 
+              className="attachment-ocr-btn"
+              onClick={handleDeleteAllEmails} 
+              disabled={isLoading || items.length === 0}
+              title="ลบอีเมลทั้งหมด"
+            >
+              🗑️ ลบทั้งหมด
+            </button>
+            <button type="button" className="attachment-ocr-btn" onClick={fetchItems} disabled={isLoading}>
+              🔄 รีเฟรช
+            </button>
+          </div>
         </div>
 
-      </div>
+        <div className="review-filters">
+          <div className="review-filter">
+            <label>
+              ค้นหา (From/Subject)
+              <input
+                type="text"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="พิมพ์เพื่อค้นหา..."
+              />
+            </label>
+          </div>
 
+          <div className="review-filter">
+            <label>
+              วันที่เริ่มต้น
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                max={toDate || undefined}
+              />
+            </label>
+          </div>
 
+          <div className="review-filter">
+            <label>
+              วันที่สิ้นสุด
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                min={fromDate || undefined}
+              />
+            </label>
+          </div>
 
-      <div className="review-filters">
+          <div className="review-filter">
+            <label>
+              ไฟล์แนบ
+              <select value={hasAttachments} onChange={(e) => setHasAttachments(e.target.value)}>
+                <option value="">ทั้งหมด</option>
+                <option value="true">มีไฟล์แนบ</option>
+                <option value="false">ไม่มีไฟล์แนบ</option>
+              </select>
+            </label>
+          </div>
 
-        <div className="review-filter">
-
-          <label>
-
-            ค้นหา (From/Subject)
-
-            <input
-
-              type="text"
-
-              value={q}
-
-              onChange={(e) => setQ(e.target.value)}
-
-              placeholder="พิมพ์เพื่อค้นหา..."
-
-            />
-
-          </label>
-
+          <div className="review-filter">
+            <label>
+              ดึงข้อความจากไฟล์
+              <select value={ocrStatus} onChange={(e) => setOcrStatus(e.target.value)}>
+                <option value="">ทั้งหมด</option>
+                <option value="done">เสร็จ</option>
+                <option value="partial">บางส่วน</option>
+                <option value="pending">รอดำเนินการ</option>
+                <option value="none">ไม่มี</option>
+              </select>
+            </label>
+          </div>
         </div>
-
-
-
-        <div className="review-filter">
-
-          <label>
-
-            วันที่เริ่มต้น
-
-            <input
-
-              type="date"
-
-              value={fromDate}
-
-              onChange={(e) => setFromDate(e.target.value)}
-
-              max={toDate || undefined}
-
-            />
-
-          </label>
-
-        </div>
-
-
-
-        <div className="review-filter">
-
-          <label>
-
-            วันที่สิ้นสุด
-
-            <input
-
-              type="date"
-
-              value={toDate}
-
-              onChange={(e) => setToDate(e.target.value)}
-
-              min={fromDate || undefined}
-
-            />
-
-          </label>
-
-        </div>
-
-
-
-        <div className="review-filter">
-
-          <label>
-
-            ไฟล์แนบ
-
-            <select value={hasAttachments} onChange={(e) => setHasAttachments(e.target.value)}>
-
-              <option value="">ทั้งหมด</option>
-
-              <option value="true">มีไฟล์แนบ</option>
-
-              <option value="false">ไม่มีไฟล์แนบ</option>
-
-            </select>
-
-          </label>
-
-        </div>
-
-
-
-        <div className="review-filter">
-
-          <label>
-
-            ดึงข้อความจากไฟล์
-
-            <select value={ocrStatus} onChange={(e) => setOcrStatus(e.target.value)}>
-
-              <option value="">ทั้งหมด</option>
-
-              <option value="done">เสร็จ</option>
-
-              <option value="partial">บางส่วน</option>
-
-              <option value="pending">รอดำเนินการ</option>
-
-              <option value="none">ไม่มี</option>
-
-            </select>
-
-          </label>
-
-        </div>
-
-      </div>
 
 
 

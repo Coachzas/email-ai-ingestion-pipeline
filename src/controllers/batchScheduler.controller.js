@@ -1,5 +1,13 @@
 const cron = require('node-cron');
 const { PrismaClient } = require('@prisma/client');
+const { 
+  startBatchProgress, 
+  completeBatchProgress, 
+  createBatchLogger,
+  updateFetchingProgress,
+  updateSavingProgress,
+  updateOcrProgress
+} = require('./batch-progress.controller');
 
 const prisma = new PrismaClient();
 const activeJobs = new Map();
@@ -102,6 +110,92 @@ exports.getAllSchedulers = async (req, res) => {
   }
 };
 
+// อัปเดต Batch Scheduler
+exports.updateScheduler = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      name,
+      batchSize,
+      scheduleType,
+      customHour,
+      customMinute,
+      startDate,
+      endDate
+    } = req.body;
+
+    const parsedStartDate = startDate ? new Date(startDate) : null;
+    const parsedEndDate = endDate ? new Date(endDate) : null;
+
+    if (!parsedStartDate || Number.isNaN(parsedStartDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: 'startDate ไม่ถูกต้อง (ต้องเป็นวันที่ที่ถูกต้อง)',
+      });
+    }
+
+    if (parsedEndDate && Number.isNaN(parsedEndDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: 'endDate ไม่ถูกต้อง (ต้องเป็นวันที่ที่ถูกต้อง)',
+      });
+    }
+
+    // แปลง scheduleType ให้ตรงกับ enum
+    const scheduleTypeEnum = scheduleType.toUpperCase();
+
+    // คำนวณ next run time
+    const nextRunAt = calculateNextRunTime(scheduleTypeEnum, customHour, customMinute);
+
+    // ตรวจสอบว่า scheduler มีอยู่จริง
+    const existingScheduler = await prisma.batchScheduler.findUnique({
+      where: { id }
+    });
+
+    if (!existingScheduler) {
+      return res.status(404).json({
+        success: false,
+        message: 'ไม่พบ scheduler นี้',
+      });
+    }
+
+    const scheduler = await prisma.batchScheduler.update({
+      where: { id },
+      data: {
+        name,
+        batchSize,
+        scheduleType: scheduleTypeEnum,
+        customHour: scheduleTypeEnum === 'CUSTOM' ? customHour : null,
+        customMinute: scheduleTypeEnum === 'CUSTOM' ? customMinute : null,
+        startDate: parsedStartDate,
+        endDate: parsedEndDate,
+        nextRunAt
+      }
+    });
+
+    // หยุด cron job เก่าและเริ่มใหม่ถ้า active
+    if (scheduler.isActive) {
+      stopCronJob(scheduler.id);
+      startCronJob(scheduler);
+    }
+
+    console.log(`✅ Updated scheduler: ${scheduler.name}`);
+
+    res.json({
+      success: true,
+      message: 'อัปเดต Batch Scheduler สำเร็จ',
+      data: scheduler
+    });
+  } catch (error) {
+    console.error('Error updating scheduler:', error);
+    res.status(500).json({
+      success: false,
+      message: 'เกิดข้อผิดพลาดในการอัปเดต Batch Scheduler',
+      error: error.message
+    });
+  }
+};
+
 // ลบ Batch Scheduler
 exports.deleteScheduler = async (req, res) => {
   try {
@@ -153,7 +247,7 @@ function startCronJob(scheduler) {
     case 'DAILY':
       cronExpression = scheduler.customHour !== null && scheduler.customMinute !== null
         ? `${scheduler.customMinute} ${scheduler.customHour} * * *`
-        : '0 2 * * *'; // ค่าเริ่มต้น 02:00
+        : '0 0 * * *'; // ค่าเริ่มต้น 00:00
       break;
     case 'HOURLY':
       cronExpression = '0 * * * *';
@@ -195,6 +289,8 @@ function stopCronJob(schedulerId) {
 
 // ทำงาน batch - บันทึกอีเมลจริงใน Database
 async function executeBatch(scheduler) {
+  const logger = createBatchLogger();
+  
   try {
     console.log(`🚀 Executing batch for scheduler: ${scheduler.name}`);
 
@@ -222,6 +318,9 @@ async function executeBatch(scheduler) {
         nextRunAt
       }
     });
+
+    // เริ่มต้น progress tracking
+    await startBatchProgress(scheduler.batchSize);
 
     // โหลดบัญชีอีเมลที่เลือกไว้ (ระบบเก่าใช้ isSelected=true)
     const account = await prisma.emailAccount.findFirst({
@@ -263,21 +362,26 @@ async function executeBatch(scheduler) {
       // ใช้ fetchEmails แบบดึงจริง ไม่ใช่ preview
       const { fetchEmails } = require('../services/imap.service');
       
+      // อัปเดต progress ว่ากำลังดึงอีเมล
+      updateFetchingProgress(`กำลังดึงอีเมลจาก ${scheduler.startDate} ถึง ${batchEndDate.toLocaleDateString('th-TH')}`, scheduler.batchSize);
+      
       // ดึงอีเมลและให้ service บันทึกลง DB จริง (เช็ค UID ไม่ซ้ำ)
       // ใช้ limit เพื่อทำงานตาม batchSize
       fetchResult = await fetchEmails(
         scheduler.startDate,
         batchEndDate,
-        false, // preview mode = false (บันทึกจริง)
         accountConfig,
         {
           limit: scheduler.batchSize,
           returnMeta: true,
-          logger: (msg) => console.log(`[IMAP] ${msg}`)
+          logger: (msg) => logger.log(`[IMAP] ${msg}`)
         }
       );
 
       console.log(`📧 IMAP fetch done: totalUids=${fetchResult?.totalUids ?? 0}, fetchedUids=${fetchResult?.fetchedUids ?? 0}, saved=${fetchResult?.savedCount ?? 0}, existing=${fetchResult?.existingCount ?? 0}`);
+      
+      // อัปเดต progress ช่วงการบันทึก
+      updateSavingProgress(`บันทึกอีเมลลงฐานข้อมูล`, fetchResult?.savedCount ?? 0, scheduler.batchSize);
 
     } catch (error) {
       console.error('❌ IMAP connection failed:', error);
@@ -294,17 +398,22 @@ async function executeBatch(scheduler) {
       
       // 🔄 เริ่มทำ OCR/Extract อัตโนมัติสำหรับอีเมลใหม่ทั้งหมด
       console.log(`🔍 Starting automatic OCR/Extract for ${emailsProcessed} new emails...`);
+      updateOcrProgress('กำลังเริ่ม OCR/Extract', 0, 0);
+      
       try {
         const { processAttachmentsForNewEmails } = require('../services/attachment-ocr.service');
         const ocrResult = await processAttachmentsForNewEmails();
         
         if (ocrResult.success) {
           console.log(`✅ OCR/Extract completed: ${ocrResult.processed} files processed, ${ocrResult.errors} errors`);
+          updateOcrProgress('OCR/Extract เสร็จสิ้น', ocrResult.processed, ocrResult.processed);
         } else {
           console.log(`⚠️ OCR/Extract completed with some issues: ${ocrResult.message}`);
+          updateOcrProgress('OCR/Extract เสร็จสิ้น (มีปัญหาบางส่วน)', ocrResult.processed || 0, ocrResult.processed || 0);
         }
       } catch (ocrError) {
         console.error(`❌ OCR/Extract failed:`, ocrError);
+        updateOcrProgress('OCR/Extract ล้มเหลว', 0, 0);
         // ไม่ทำให้ batch ล้มเหลว แค่ log error
       }
     }
@@ -320,6 +429,9 @@ async function executeBatch(scheduler) {
     });
 
     console.log(`✅ Batch completed: ${emailsProcessed} emails processed and saved to database`);
+
+    // Complete progress tracking
+    completeBatchProgress();
 
     return {
       batchRunId: batchRun.id,
@@ -352,7 +464,12 @@ async function executeBatch(scheduler) {
       console.error('Failed to update batch run status:', updateError);
     }
 
+    // Complete progress with error
+    completeBatchProgress();
+    
     throw error;
+  } finally {
+    logger.restore();
   }
 }
 
@@ -408,7 +525,8 @@ function calculateNextRunTime(scheduleType, customHour, customMinute) {
 
   switch (scheduleType) {
     case 'DAILY':
-      next.setHours(customHour || 2, customMinute || 0, 0, 0);
+      next.setHours(customHour !== undefined && customHour !== null ? customHour : 0, 
+                   customMinute !== undefined && customMinute !== null ? customMinute : 0, 0, 0);
       if (next <= now) {
         next.setDate(now.getDate() + 1);
       }
@@ -417,7 +535,8 @@ function calculateNextRunTime(scheduleType, customHour, customMinute) {
       next.setHours(now.getHours() + 1, 0, 0, 0);
       break;
     case 'CUSTOM':
-      next.setHours(customHour || 0, customMinute || 0, 0, 0);
+      next.setHours(customHour !== undefined && customHour !== null ? customHour : 0, 
+                   customMinute !== undefined && customMinute !== null ? customMinute : 0, 0, 0);
       if (next <= now) {
         next.setDate(now.getDate() + 1);
       }
@@ -490,6 +609,83 @@ exports.getBatchStatus = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'เกิดข้อผิดพลาดในการดึงสถานะ batch',
+      error: error.message
+    });
+  }
+};
+
+// ตั้งค่า Active Scheduler เดียว
+exports.setActiveScheduler = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // ตรวจสอบว่า scheduler ที่จะเปลี่ยนเป็น active หรือ inactive
+    const targetScheduler = await prisma.batchScheduler.findUnique({
+      where: { id }
+    });
+    
+    if (!targetScheduler) {
+      return res.status(404).json({
+        success: false,
+        message: 'ไม่พบ scheduler นี้',
+      });
+    }
+    
+    if (targetScheduler.isActive) {
+      // ถ้าเป็น active อยู่แล้ว ให้ inactive ตัวเดียวนี้
+      await prisma.batchScheduler.update({
+        where: { id },
+        data: { isActive: false }
+      });
+      
+      // หยุด cron job ของตัวนี้
+      stopCronJob(id);
+      
+      console.log(`✅ Inactive scheduler: ${targetScheduler.name}`);
+      
+      res.json({
+        success: true,
+        message: `Inactive "${targetScheduler.name}" สำเร็จ`,
+        data: { ...targetScheduler, isActive: false }
+      });
+    } else {
+      // ถ้าเป็น inactive ให้ active ตัวนี้ และ inactive ทุกตัวอื่น
+      const allSchedulers = await prisma.batchScheduler.findMany({
+        where: { isActive: true }
+      });
+      
+      for (const scheduler of allSchedulers) {
+        stopCronJob(scheduler.id);
+      }
+      
+      // ตั้งค่าทุก scheduler เป็น inactive
+      await prisma.batchScheduler.updateMany({
+        where: { isActive: true },
+        data: { isActive: false }
+      });
+      
+      // ตั้งค่า scheduler ที่เลือกเป็น active
+      const scheduler = await prisma.batchScheduler.update({
+        where: { id },
+        data: { isActive: true }
+      });
+      
+      // เริ่ม cron job ใหม่สำหรับ scheduler ที่เลือก
+      startCronJob(scheduler);
+      
+      console.log(`✅ Set "${scheduler.name}" as the only active scheduler`);
+      
+      res.json({
+        success: true,
+        message: `ตั้ง "${scheduler.name}" เป็น Active Scheduler ตัวเดียวสำเร็จ`,
+        data: scheduler
+      });
+    }
+  } catch (error) {
+    console.error('Error setting active scheduler:', error);
+    res.status(500).json({
+      success: false,
+      message: 'เกิดข้อผิดพลาดในการตั้ง Active Scheduler',
       error: error.message
     });
   }
@@ -575,8 +771,10 @@ module.exports = {
   activeJobs,
   stopCronJob,
   createScheduler: exports.createScheduler,
+  updateScheduler: exports.updateScheduler,
   getAllSchedulers: exports.getAllSchedulers,
   deleteScheduler: exports.deleteScheduler,
+  setActiveScheduler: exports.setActiveScheduler,
   initializeSchedulers: exports.initializeSchedulers,
   getBatchStatus: exports.getBatchStatus,
   testImapConnection: exports.testImapConnection,

@@ -2,15 +2,14 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 
-const ingestRoutes = require('./routes/ingest.routes');
 const reviewRoutes = require('./routes/review.routes');
-const ocrProgressRoutes = require('./routes/ocr-progress.routes');
-const emailProgressRoutes = require('./routes/email-progress.routes');
+const batchProgressRoutes = require('./routes/batch-progress.routes');
 const accountRoutes = require('./routes/account.routes');
 const geminiRoutes = require('./routes/gemini.routes');
 const tokenUsageRoutes = require('./routes/token-usage.routes');
 const batchSchedulerRoutes = require('./routes/batchScheduler.routes');
 // Note: Removed legacy email.routes - not used in current system
+// Note: Removed ingest.routes - manual ingest system removed
 
 const path = require('path');
 
@@ -21,14 +20,10 @@ app.use(express.static(path.join(__dirname, '../UI')));
 app.use(cors());
 app.use(express.json({ limit: '50mb' })); 
 
-// IMAP routes
-app.use('/api/ingest', ingestRoutes);
 // Review routes
 app.use('/api/review', reviewRoutes);
-// OCR Progress routes
-app.use('/api/ocr-progress', ocrProgressRoutes);
-// Email Progress routes
-app.use('/api/email-progress', emailProgressRoutes);
+// Batch Progress routes (unified email + OCR progress)
+app.use('/api/batch-progress', batchProgressRoutes);
 // Account routes
 app.use('/api/accounts', accountRoutes);
 // Gemini routes

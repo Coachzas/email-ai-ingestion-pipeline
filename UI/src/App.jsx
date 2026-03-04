@@ -8,7 +8,7 @@ import AccountManager from './components/AccountManager.jsx'
 import TokenUsage from './components/TokenUsage.jsx'
 import BatchSchedulerModal from './components/BatchSchedulerModal.jsx'
 import BatchSchedulerList from './components/BatchSchedulerList.jsx'
-import { useEmailPipeline } from './hooks/useEmailPipeline'
+import { useBatchProgress } from "./hooks/useBatchProgress"
 
 // Lazy load components
 
@@ -20,6 +20,7 @@ export default function App() {
   const [reviewQueueItems, setReviewQueueItems] = useState([])
   const [showBatchScheduler, setShowBatchScheduler] = useState(false)
   const [showBatchSchedulerList, setShowBatchSchedulerList] = useState(false)
+  const [editScheduler, setEditScheduler] = useState(null)
 
   const [now, setNow] = useState(() => new Date())
   const [nextBatchRunAt, setNextBatchRunAt] = useState(null)
@@ -28,12 +29,68 @@ export default function App() {
   try {
 
   const {
-    isLoading,
-    log,
-    error,
-    emailProgress,
-    clearError
-  } = useEmailPipeline()
+    isProcessing,
+    currentPhase,
+    currentItem,
+    totalEmails,
+    processedEmails,
+    totalAttachments,
+    processedAttachments,
+    errors,
+    getOverallProgress,
+    getPhaseText
+  } = useBatchProgress()
+
+  const handleEditScheduler = (scheduler) => {
+    setEditScheduler(scheduler);
+    setShowBatchScheduler(true);
+  };
+
+  const handleSaveScheduler = async (data) => {
+    try {
+      const isEdit = !!data.id;
+      const url = isEdit ? `/api/batch-schedulers/${data.id}` : '/api/batch-schedulers';
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: data.name,
+          batchSize: data.batchSize,
+          scheduleType: data.scheduleType,
+          customHour: data.customHour,
+          customMinute: data.customMinute,
+          startDate: data.startDate,
+          endDate: data.endDate || null
+        })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log('Batch Scheduler saved successfully:', result.data);
+        alert(isEdit ? '✅ อัปเดต Batch Scheduler สำเร็จแล้ว!' : '✅ บันทึก Batch Scheduler สำเร็จแล้ว!');
+        setShowBatchScheduler(false);
+        setEditScheduler(null);
+        
+        // Refresh scheduler list if it's open
+        if (showBatchSchedulerList) {
+          // Trigger refresh by closing and reopening the list
+          setShowBatchSchedulerList(false);
+          setTimeout(() => setShowBatchSchedulerList(true), 100);
+        }
+      } else {
+        console.error('Failed to save scheduler:', result);
+        alert(`❌ เกิดข้อผิดพลาด: ${result.message}`);
+      }
+    } catch (error) {
+      console.error('Error saving scheduler:', error);
+      alert('❌ เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์');
+    }
+  };
 
   const handleReviewQueueItems = useCallback((items) => {
     setReviewQueueItems(items)
@@ -190,36 +247,54 @@ export default function App() {
         <div style={{ padding: '0 20px' }}>
           {currentView === 'pipeline' && (
             <>
-              {error && (
-                <div 
-                  className="error-message" 
-                  role="alert" 
-                  aria-live="polite"
-                  id="error-message"
-                  style={{ 
-                    backgroundColor: '#dc3545', 
-                    color: '#fff', 
-                    padding: '10px', 
-                    borderRadius: '4px', 
-                    marginBottom: '20px' 
-                  }}
-                >
-                  <span>❌ {error.message}</span>
-                  <button 
-                    onClick={clearError} 
-                    className="close-error"
-                    aria-label="ปิดข้อความแจ้งข้อผิดพลาด"
-                    style={{ 
-                      background: 'none', 
-                      border: 'none', 
-                      color: '#fff', 
-                      fontSize: '18px', 
-                      cursor: 'pointer',
-                      marginLeft: '10px'
-                    }}
-                  >
-                    ×
-                  </button>
+              {/* Batch Progress Indicator */}
+              {isProcessing && (
+                <div style={{
+                  backgroundColor: '#111',
+                  border: '1px solid #333',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  marginBottom: '20px'
+                }}>
+                  <h3 style={{ margin: '0 0 12px 0', color: '#fff', fontSize: '16px' }}>
+                    🔄 {getPhaseText()}
+                  </h3>
+                  <div style={{ marginBottom: '8px' }}>
+                    <div style={{
+                      backgroundColor: '#333',
+                      borderRadius: '4px',
+                      height: '8px',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        backgroundColor: '#007bff',
+                        height: '100%',
+                        width: `${getOverallProgress()}%`,
+                        transition: 'width 0.3s ease'
+                      }} />
+                    </div>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginTop: '4px',
+                      fontSize: '12px',
+                      color: '#bbb'
+                    }}>
+                      <span>{getOverallProgress()}%</span>
+                      <span>{currentItem}</span>
+                    </div>
+                  </div>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                    gap: '8px',
+                    fontSize: '11px',
+                    color: '#999'
+                  }}>
+                    <div>📧 อีเมล: {processedEmails}/{totalEmails}</div>
+                    <div>📎 ไฟล์: {processedAttachments}/{totalAttachments}</div>
+                    <div>❌ ข้อผิดพลาด: {errors}</div>
+                  </div>
                 </div>
               )}
 
@@ -232,16 +307,16 @@ export default function App() {
                   <button 
                     type="button"
                     onClick={() => setShowBatchSchedulerList(true)}
-                    disabled={isLoading}
+                    disabled={isProcessing}
                     style={{
                       padding: '8px 16px',
                       backgroundColor: '#28a745',
                       color: '#fff',
                       border: 'none',
                       borderRadius: '4px',
-                      cursor: isLoading ? 'not-allowed' : 'pointer',
+                      cursor: isProcessing ? 'not-allowed' : 'pointer',
                       fontSize: '14px',
-                      opacity: isLoading ? 0.6 : 1,
+                      opacity: isProcessing ? 0.6 : 1,
                       transition: 'all 0.2s ease'
                     }}
                   >
@@ -280,20 +355,6 @@ export default function App() {
                     </div>
                   </div>
 
-              <div id="log" role="log" aria-live="polite">
-                <pre>{log}</pre>
-              </div>
-
-              {/* Email Progress Indicator */}
-              <EmailProgressIndicator 
-                isProcessing={emailProgress.isProcessing}
-                progress={emailProgress.progress}
-                currentEmail={emailProgress.currentEmail}
-                totalEmails={emailProgress.totalEmails}
-                processed={emailProgress.processed}
-                errors={emailProgress.errors}
-              />
-
               <ReviewQueue onOpenEmail={openReviewEmail} onItemsChange={handleReviewQueueItems} />
 
               
@@ -320,49 +381,18 @@ export default function App() {
         <BatchSchedulerList
           isOpen={showBatchSchedulerList}
           onClose={() => setShowBatchSchedulerList(false)}
-          onEdit={() => {
-            setShowBatchSchedulerList(false);
-            setShowBatchScheduler(true);
-          }}
+          onEdit={handleEditScheduler}
         />
 
         {/* Batch Scheduler Modal - Moved outside main container for proper overlay */}
         <BatchSchedulerModal
           isOpen={showBatchScheduler}
-          onClose={() => setShowBatchScheduler(false)}
-          onSave={async (data) => {
-            try {
-              const response = await fetch('/api/batch-schedulers', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  name: data.name,
-                  batchSize: data.batchSize,
-                  scheduleType: data.scheduleType,
-                  customHour: data.customHour,
-                  customMinute: data.customMinute,
-                  startDate: data.startDate,
-                  endDate: data.endDate || null
-                })
-              });
-
-              const result = await response.json();
-              
-              if (result.success) {
-                console.log('Batch Scheduler saved successfully:', result.data);
-                alert('✅ บันทึก Batch Scheduler สำเร็จแล้ว!');
-                setShowBatchScheduler(false);
-              } else {
-                console.error('Failed to save scheduler:', result);
-                alert(`❌ เกิดข้อผิดพลาด: ${result.message}`);
-              }
-            } catch (error) {
-              console.error('Error saving scheduler:', error);
-              alert('❌ เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์');
-            }
+          editScheduler={editScheduler}
+          onClose={() => {
+            setShowBatchScheduler(false);
+            setEditScheduler(null);
           }}
+          onSave={handleSaveScheduler}
         />
           
         <style jsx>{`

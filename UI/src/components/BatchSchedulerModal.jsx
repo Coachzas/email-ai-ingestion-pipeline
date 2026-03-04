@@ -1,16 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Calendar, Clock, Save, X, Settings } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from "react";
+import { Calendar, Clock, Save, X, Settings } from "lucide-react";
 
-const BatchSchedulerModal = ({ isOpen, onClose, onSave }) => {
+const BatchSchedulerModal = ({ isOpen, onClose, onSave, editScheduler }) => {
   const [formData, setFormData] = useState({
-    name: '',
+    name: "",
     batchSize: 100,
-    scheduleType: 'daily', // 'daily', 'hourly', 'custom'
-    customTime: '02:00', // for custom schedule
+    scheduleType: "daily", // 'daily', 'hourly', 'custom'
+    customTime: "02:00", // for custom schedule
     customHour: 2,
     customMinute: 0,
-    startDate: new Date().toISOString().split('T')[0],
-    endDate: ''
+    startDate: new Date().toISOString().split("T")[0],
+    endDate: "",
   });
 
   const [now, setNow] = useState(() => new Date());
@@ -23,22 +23,88 @@ const BatchSchedulerModal = ({ isOpen, onClose, onSave }) => {
     return () => clearInterval(timer);
   }, [isOpen]);
 
+  // Initialize form data when editScheduler changes
+  useEffect(() => {
+    if (editScheduler) {
+      setFormData({
+        name: editScheduler.name || "",
+        batchSize: editScheduler.batchSize || 100,
+        scheduleType: editScheduler.scheduleType?.toLowerCase() || "daily",
+        customTime: editScheduler.customHour !== null && editScheduler.customMinute !== null 
+          ? `${String(editScheduler.customHour).padStart(2, '0')}:${String(editScheduler.customMinute).padStart(2, '0')}`
+          : "02:00",
+        customHour: editScheduler.customHour || 2,
+        customMinute: editScheduler.customMinute || 0,
+        startDate: editScheduler.startDate ? new Date(editScheduler.startDate).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+        endDate: editScheduler.endDate ? new Date(editScheduler.endDate).toISOString().split("T")[0] : "",
+      });
+    } else {
+      // Reset form for new scheduler
+      setFormData({
+        name: "",
+        batchSize: 100,
+        scheduleType: "daily",
+        customTime: "00:00",
+        customHour: 0,
+        customMinute: 0,
+        startDate: new Date().toISOString().split("T")[0],
+        endDate: "",
+      });
+    }
+  }, [editScheduler, isOpen]);
+
+  // Prevent mouse wheel scroll on number inputs
+  useEffect(() => {
+    const handleWheel = (e) => {
+      if (e.target.type === "number") {
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener("wheel", handleWheel, { passive: false });
+
+    return () => {
+      document.removeEventListener("wheel", handleWheel);
+    };
+  }, []);
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSave(formData);
+    
+    // Ensure customHour and customMinute are properly set for DAILY schedule
+    let dataToSave = { ...formData };
+    
+    if (formData.scheduleType === 'daily') {
+      // For DAILY, if no custom time is set, use 00:00
+      if (formData.customHour === null || formData.customHour === undefined) {
+        dataToSave.customHour = 0;
+      }
+      if (formData.customMinute === null || formData.customMinute === undefined) {
+        dataToSave.customMinute = 0;
+      }
+    }
+    
+    // Add editScheduler ID if editing
+    if (editScheduler) {
+      dataToSave = { ...dataToSave, id: editScheduler.id };
+    }
+      
+    onSave(dataToSave);
     onClose();
   };
 
   const getScheduleDescription = () => {
     switch (formData.scheduleType) {
-      case 'daily':
-        return 'ทุกวันเวลา 02:00 น.';
-      case 'hourly':
-        return 'ทุกชั่วโมง';
-      case 'custom':
+      case "daily":
+        return formData.customHour !== null && formData.customMinute !== null
+          ? `ทุกวันเวลา ${String(formData.customHour).padStart(2, '0')}:${String(formData.customMinute).padStart(2, '0')}`
+          : 'ทุกวันเวลา 00:00';
+      case "hourly":
+        return "ทุกชั่วโมง";
+      case "custom":
         return `ทุกวันเวลา ${String(formData.customHour || 0).padStart(2, '0')}:${String(formData.customMinute || 0).padStart(2, '0')}`;
       default:
-        return '';
+        return formData.scheduleType;
     }
   };
 
@@ -47,19 +113,26 @@ const BatchSchedulerModal = ({ isOpen, onClose, onSave }) => {
     const hour = formData.customHour ?? 0;
     const minute = formData.customMinute ?? 0;
 
-    if (formData.scheduleType === 'hourly') {
+    if (formData.scheduleType === "hourly") {
       next.setSeconds(0, 0);
       next.setHours(now.getHours() + 1, 0, 0, 0);
       return next;
     }
 
-    if (formData.scheduleType === 'daily') {
-      next.setHours(2, 0, 0, 0);
+    if (formData.scheduleType === "daily") {
+      const dailyHour = formData.customHour !== null && formData.customMinute !== null 
+        ? formData.customHour 
+        : 0;
+      const dailyMinute = formData.customHour !== null && formData.customMinute !== null 
+        ? formData.customMinute 
+        : 0;
+      
+      next.setHours(dailyHour, dailyMinute, 0, 0);
       if (next <= now) next.setDate(next.getDate() + 1);
       return next;
     }
 
-    if (formData.scheduleType === 'custom') {
+    if (formData.scheduleType === "custom") {
       next.setHours(hour, minute, 0, 0);
       if (next <= now) next.setDate(next.getDate() + 1);
       return next;
@@ -69,9 +142,9 @@ const BatchSchedulerModal = ({ isOpen, onClose, onSave }) => {
   }, [formData.customHour, formData.customMinute, formData.scheduleType, now]);
 
   const countdownText = useMemo(() => {
-    if (!nextRunAt) return '';
+    if (!nextRunAt) return "";
     const diffMs = nextRunAt.getTime() - now.getTime();
-    if (diffMs <= 0) return 'กำลังเริ่มทำงาน...';
+    if (diffMs <= 0) return "กำลังเริ่มทำงาน...";
 
     const totalSeconds = Math.floor(diffMs / 1000);
     const days = Math.floor(totalSeconds / 86400);
@@ -81,161 +154,88 @@ const BatchSchedulerModal = ({ isOpen, onClose, onSave }) => {
 
     const parts = [];
     if (days) parts.push(`${days} วัน`);
-    if (hours || days) parts.push(`${String(hours).padStart(2, '0')} ชม.`);
-    parts.push(`${String(minutes).padStart(2, '0')} นาที`);
-    parts.push(`${String(seconds).padStart(2, '0')} วิ`);
-    return parts.join(' ');
+    if (hours || days) parts.push(`${String(hours).padStart(2, "0")} ชม.`);
+    parts.push(`${String(minutes).padStart(2, "0")} นาที`);
+    parts.push(`${String(seconds).padStart(2, "0")} วิ`);
+    return parts.join(" ");
   }, [nextRunAt, now]);
 
   const formatThaiTime = (date) => {
     try {
-      return new Intl.DateTimeFormat('th-TH', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
+      return new Intl.DateTimeFormat("th-TH", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
       }).format(date);
     } catch {
-      return date.toLocaleString('th-TH');
+      return date.toLocaleString("th-TH");
     }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.7)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 9999,
-      padding: '1rem'
-    }}>
-      <div style={{
-        backgroundColor: '#ffffff',
-        borderRadius: '12px',
-        width: '100%',
-        maxWidth: '672px',
-        maxHeight: '90vh',
-        overflow: 'hidden',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-        transform: 'scale(1)',
-        transition: 'all 0.3s ease'
-      }}>
+    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl w-full max-w-2xl max-h-screen overflow-hidden shadow-2xl transform scale-100 transition-all duration-300">
         {/* Header */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '1.5rem',
-          borderBottom: '1px solid #e5e7eb',
-          background: 'linear-gradient(to right, #eff6ff, #eef2ff)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{
-              width: '3rem',
-              height: '3rem',
-              backgroundColor: '#2563eb',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-            }}>
-              <Settings style={{ width: '1.5rem', height: '1.5rem', color: '#ffffff' }} />
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg">
+              <Settings className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold', color: '#111827' }}>
-                ตั้งค่า Batch Scheduler
+              <h2 className="m-0 text-2xl font-bold text-gray-900">
+                {editScheduler ? 'แก้ไข Batch Scheduler' : 'สร้าง Batch Scheduler'}
               </h2>
-              <p style={{ margin: 0, fontSize: '0.875rem', color: '#6b7280' }}>
-                กำหนดการดึงอีเมลอัตโนมัติ
+              <p className="m-0 text-sm text-gray-600">
+                {editScheduler ? 'แก้ไขการตั้งเวลาดึงอีเมลอัตโนมัติ' : 'ตั้งค่าการดึงอีเมลอัตโนมัติตามรอบ'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            style={{
-              padding: '0.75rem',
-              backgroundColor: 'transparent',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              transition: 'background-color 0.2s'
-            }}
-            onMouseOver={(e) => e.target.style.backgroundColor = '#f3f4f6'}
-            onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
+            className="p-3 bg-transparent border-none rounded-lg cursor-pointer transition-colors hover:bg-gray-100"
           >
-            <X style={{ width: '1.5rem', height: '1.5rem', color: '#6b7280' }} />
+            <X className="w-6 h-6 text-gray-600" />
           </button>
         </div>
 
         {/* Scrollable Form Content */}
-        <div style={{
-          maxHeight: '60vh',
-          overflowY: 'auto'
-        }}>
-          <form onSubmit={handleSubmit} style={{ padding: '1.5rem' }}>
-            <div style={{
-              marginBottom: '1.5rem',
-              padding: '1rem',
-              borderRadius: '10px',
-              border: '1px solid #e5e7eb',
-              background: 'linear-gradient(to right, #f8fafc, #eef2ff)'
-            }}>
-              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-                <div style={{
-                  width: '2.25rem',
-                  height: '2.25rem',
-                  borderRadius: '8px',
-                  backgroundColor: '#111827',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <Clock style={{ width: '1.25rem', height: '1.25rem', color: '#ffffff' }} />
+        <div className="max-h-96 overflow-y-auto">
+          <form onSubmit={handleSubmit} className="p-6">
+            <div className="mb-6 p-4 rounded-xl border border-gray-200 bg-gradient-to-r from-gray-50 to-indigo-50">
+              <div className="flex gap-3 items-start">
+                <div className="w-9 h-9 rounded-lg bg-gray-900 flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-white" />
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>เวลาปัจจุบัน</div>
-                  <div style={{ fontSize: '1.125rem', fontWeight: '700', color: '#111827', marginTop: '0.25rem' }}>
+                <div className="flex-1">
+                  <div className="text-sm text-gray-600">เวลาปัจจุบัน</div>
+                  <div className="text-lg font-bold text-gray-900 mt-1">
                     {formatThaiTime(now)}
                   </div>
 
-                  <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                    <div style={{
-                      flex: 1,
-                      minWidth: '14rem',
-                      padding: '0.75rem',
-                      borderRadius: '8px',
-                      backgroundColor: '#ffffff',
-                      border: '1px solid #e5e7eb'
-                    }}>
-                      <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>จะทำงานครั้งถัดไป</div>
-                      <div style={{ fontSize: '1rem', fontWeight: '700', color: '#2563eb', marginTop: '0.25rem' }}>
-                        {nextRunAt ? formatThaiTime(nextRunAt) : '-'}
+                  <div className="mt-3 flex gap-3 flex-wrap">
+                    <div className="flex-1 min-w-56 p-3 rounded-lg bg-white border border-gray-200">
+                      <div className="text-sm text-gray-600">
+                        จะทำงานครั้งถัดไป
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                        {countdownText ? `อีก ${countdownText}` : ''}
+                      <div className="text-base font-bold text-blue-600 mt-1">
+                        {nextRunAt ? formatThaiTime(nextRunAt) : "-"}
+                      </div>
+                      <div className="text-xs text-gray-600 mt-1">
+                        {countdownText ? `อีก ${countdownText}` : ""}
                       </div>
                     </div>
 
-                    <div style={{
-                      width: '14rem',
-                      padding: '0.75rem',
-                      borderRadius: '8px',
-                      backgroundColor: '#ffffff',
-                      border: '1px solid #e5e7eb'
-                    }}>
-                      <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>รูปแบบการทำงาน</div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: '700', color: '#111827', marginTop: '0.25rem' }}>
+                    <div className="w-56 p-3 rounded-lg bg-white border border-gray-200">
+                      <div className="text-sm text-gray-600">
+                        รูปแบบการทำงาน
+                      </div>
+                      <div className="text-sm font-bold text-gray-900 mt-1">
                         {getScheduleDescription()}
                       </div>
                     </div>
@@ -244,51 +244,27 @@ const BatchSchedulerModal = ({ isOpen, onClose, onSave }) => {
               </div>
             </div>
 
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
-                🏷️ ชื่อ Scheduler
-              </label>
+            <div className="mb-6">
+              <label className="form-label">🏷️ ชื่อ Scheduler</label>
               <input
                 type="text"
                 required
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  fontSize: '1rem',
-                  outline: 'none',
-                  transition: 'border-color 0.2s'
-                }}
-                onFocus={(e) => e.target.style.borderColor = '#2563eb'}
-                onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+                className="form-input"
                 placeholder="เช่น Monthly Archive, Hourly Sync"
               />
-              <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+              <p className="text-xs text-gray-600 mt-1">
                 ตั้งชื่อเพื่อแยกแยะ scheduler ต่างๆ
               </p>
             </div>
 
-          {/* Batch Size */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
-                📦 Batch Size (อีเมลต่อรอบ)
-              </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            {/* Batch Size */}
+            <div className="mb-6">
+              <label className="form-label">📦 Batch Size (อีเมลต่อรอบ)</label>
+              <div className="flex items-center gap-4">
                 <input
                   type="number"
                   min="10"
@@ -296,341 +272,213 @@ const BatchSchedulerModal = ({ isOpen, onClose, onSave }) => {
                   value={formData.batchSize}
                   onChange={(e) => {
                     const value = parseInt(e.target.value) || 10;
-                    setFormData({ ...formData, batchSize: Math.min(2000, Math.max(10, value)) });
+                    setFormData({
+                      ...formData,
+                      batchSize: Math.min(2000, Math.max(10, value)),
+                    });
                   }}
-                  style={{
-                    flex: 1,
-                    padding: '0.75rem',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '8px',
-                    fontSize: '1rem',
-                    fontWeight: '500',
-                    color: '#374151',
-                    backgroundColor: '#ffffff',
-                    outline: 'none',
-                    transition: 'border-color 0.2s'
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = '#2563eb'}
-                  onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+                  className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg text-base font-medium text-gray-700 bg-white outline-none transition-colors focus:border-blue-600"
                 />
-                <div style={{ width: '5rem', textAlign: 'center' }}>
-                  <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#2563eb' }}>
+                <div className="w-20 text-center">
+                  <span className="text-2xl font-bold text-blue-600">
                     {formData.batchSize}
                   </span>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>อีเมล</div>
+                  <div className="text-xs text-gray-600">อีเมล</div>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <div className="flex gap-2 mt-2">
                 <button
                   type="button"
-                  onClick={() => setFormData({ ...formData, batchSize: Math.min(2000, formData.batchSize + 50) })}
-                  style={{
-                    padding: '0.25rem 0.75rem',
-                    backgroundColor: '#10b981',
-                    color: '#ffffff',
-                    borderRadius: '6px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    transition: 'background-color 0.2s'
-                  }}
-                  onMouseOver={(e) => e.target.style.backgroundColor = '#059669'}
-                  onMouseOut={(e) => e.target.style.backgroundColor = '#10b981'}
+                  onClick={() =>
+                    setFormData({
+                      ...formData,
+                      batchSize: Math.min(2000, formData.batchSize + 50),
+                    })
+                  }
+                  className="px-3 py-1 bg-green-500 text-white rounded-md border-none cursor-pointer text-sm font-medium transition-colors hover:bg-green-600"
                 >
                   +50
                 </button>
                 <button
                   type="button"
-                  onClick={() => setFormData({ ...formData, batchSize: Math.min(2000, formData.batchSize + 100) })}
-                  style={{
-                    padding: '0.25rem 0.75rem',
-                    backgroundColor: '#10b981',
-                    color: '#ffffff',
-                    borderRadius: '6px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    transition: 'background-color 0.2s'
-                  }}
-                  onMouseOver={(e) => e.target.style.backgroundColor = '#059669'}
-                  onMouseOut={(e) => e.target.style.backgroundColor = '#10b981'}
+                  onClick={() =>
+                    setFormData({
+                      ...formData,
+                      batchSize: Math.min(2000, formData.batchSize + 100),
+                    })
+                  }
+                  className="px-3 py-1 bg-green-500 text-white rounded-md border-none cursor-pointer text-sm font-medium transition-colors hover:bg-green-600"
                 >
                   +100
                 </button>
                 <button
                   type="button"
-                  onClick={() => setFormData({ ...formData, batchSize: Math.min(2000, formData.batchSize + 500) })}
-                  style={{
-                    padding: '0.25rem 0.75rem',
-                    backgroundColor: '#10b981',
-                    color: '#ffffff',
-                    borderRadius: '6px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    transition: 'background-color 0.2s'
-                  }}
-                  onMouseOver={(e) => e.target.style.backgroundColor = '#059669'}
-                  onMouseOut={(e) => e.target.style.backgroundColor = '#10b981'}
+                  onClick={() =>
+                    setFormData({
+                      ...formData,
+                      batchSize: Math.min(2000, formData.batchSize + 500),
+                    })
+                  }
+                  className="px-3 py-1 bg-green-500 text-white rounded-md border-none cursor-pointer text-sm font-medium transition-colors hover:bg-green-600"
                 >
                   +500
                 </button>
                 <button
                   type="button"
-                  onClick={() => setFormData({ ...formData, batchSize: Math.min(2000, formData.batchSize + 1000) })}
-                  style={{
-                    padding: '0.25rem 0.75rem',
-                    backgroundColor: '#10b981',
-                    color: '#ffffff',
-                    borderRadius: '6px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    transition: 'background-color 0.2s'
-                  }}
-                  onMouseOver={(e) => e.target.style.backgroundColor = '#059669'}
-                  onMouseOut={(e) => e.target.style.backgroundColor = '#10b981'}
+                  onClick={() =>
+                    setFormData({
+                      ...formData,
+                      batchSize: Math.min(2000, formData.batchSize + 1000),
+                    })
+                  }
+                  className="px-3 py-1 bg-green-500 text-white rounded-md border-none cursor-pointer text-sm font-medium transition-colors hover:bg-green-600"
                 >
                   +1000
                 </button>
               </div>
             </div>
 
-          {/* Schedule Type */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
-                ⏰ กำหนดเวลา
-              </label>
+            {/* Schedule Type */}
+            <div className="mb-6">
+              <label className="form-label">⏰ กำหนดเวลา</label>
               <select
                 value={formData.scheduleType}
-                onChange={(e) => setFormData({ ...formData, scheduleType: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  fontSize: '1rem',
-                  outline: 'none',
-                  backgroundColor: '#ffffff',
-                  cursor: 'pointer'
-                }}
+                onChange={(e) =>
+                  setFormData({ ...formData, scheduleType: e.target.value })
+                }
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-base outline-none bg-white cursor-pointer"
               >
                 <option value="daily">ทุกวัน (Daily)</option>
                 <option value="hourly">ทุกชั่วโมง (Hourly)</option>
                 <option value="custom">กำหนดเอง (Custom)</option>
               </select>
-              <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+              <p className="text-xs text-gray-600 mt-1">
                 {getScheduleDescription()}
               </p>
             </div>
 
             {/* Custom Time */}
-            {formData.scheduleType === 'custom' && (
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  color: '#374151',
-                  marginBottom: '0.5rem'
-                }}>
+            {(formData.scheduleType === "custom" || (formData.scheduleType === "daily" && formData.customHour !== null && formData.customMinute !== null)) && (
+              <div className="mb-6">
+                <label className="form-label">
                   🕐 เวลาทำงาน (ชั่วโมง:นาที)
                 </label>
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <div className="flex gap-2 items-center">
                   <input
                     type="number"
                     min="0"
                     max="23"
                     required
                     value={formData.customHour || 0}
-                    onChange={(e) => setFormData({ ...formData, customHour: parseInt(e.target.value), customTime: `${String(parseInt(e.target.value)).padStart(2, '0')}:${String(formData.customMinute || 0).padStart(2, '0')}` })}
-                    style={{
-                      width: '80px',
-                      padding: '0.75rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '8px',
-                      fontSize: '1rem',
-                      outline: 'none',
-                      textAlign: 'center'
-                    }}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        customHour: parseInt(e.target.value),
+                        customTime: `${String(parseInt(e.target.value)).padStart(2, "0")}:${String(formData.customMinute || 0).padStart(2, "0")}`,
+                      })
+                    }
+                    className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-base outline-none text-center"
                     placeholder="00"
                   />
-                  <span style={{ fontSize: '1.2rem', color: '#6b7280' }}>:</span>
+                  <span className="text-xl text-gray-600">:</span>
                   <input
                     type="number"
                     min="0"
                     max="59"
                     required
                     value={formData.customMinute || 0}
-                    onChange={(e) => setFormData({ ...formData, customMinute: parseInt(e.target.value), customTime: `${String(formData.customHour || 0).padStart(2, '0')}:${String(parseInt(e.target.value)).padStart(2, '0')}` })}
-                    style={{
-                      width: '80px',
-                      padding: '0.75rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '8px',
-                      fontSize: '1rem',
-                      outline: 'none',
-                      textAlign: 'center'
-                    }}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        customMinute: parseInt(e.target.value),
+                        customTime: `${String(formData.customHour || 0).padStart(2, "0")}:${String(parseInt(e.target.value)).padStart(2, "0")}`,
+                      })
+                    }
+                    className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-base outline-none text-center"
                     placeholder="00"
                   />
-                  <span style={{ fontSize: '0.875rem', color: '#6b7280', marginLeft: '0.5rem' }}>
+                  <span className="text-sm text-gray-600 ml-2">
                     (24 ชั่วโมง)
                   </span>
                 </div>
-                <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem' }}>
-                  💡 ตัวอย่าง: 14:30 = 2:30 บ่าย, 02:00 = 2 โมงเช้า
-                </p>
               </div>
             )}
 
             {/* Date Range */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  color: '#374151',
-                  marginBottom: '0.5rem'
-                }}>
-                  📅 วันที่เริ่มต้น
-                </label>
+            <div className="mb-6">
+              <div className="mb-4">
+                <label className="form-label">📅 วันที่เริ่มต้นดึงอีเมล</label>
                 <input
                   type="date"
                   required
                   value={formData.startDate}
-                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem 1rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '8px',
-                    fontSize: '1rem',
-                    outline: 'none',
-                    transition: 'border-color 0.2s'
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = '#2563eb'}
-                  onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                  onChange={(e) =>
+                    setFormData({ ...formData, startDate: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-base outline-none transition-colors focus:border-blue-600"
                 />
               </div>
               <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  color: '#374151',
-                  marginBottom: '0.5rem'
-                }}>
-                  📅 วันที่สิ้นสุด (ถ้ามี)
+                <label className="form-label">
+                  📅 วันที่สิ้นสุดดึงอีเมล (ถ้ามี)
                 </label>
                 <input
                   type="date"
                   value={formData.endDate}
-                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, endDate: e.target.value })
+                  }
                   placeholder="ไม่จำกัด"
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem 1rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '8px',
-                    fontSize: '1rem',
-                    outline: 'none',
-                    transition: 'border-color 0.2s'
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = '#2563eb'}
-                  onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-base outline-none transition-colors focus:border-blue-600"
                 />
               </div>
             </div>
 
-          {/* Preview */}
-            <div style={{
-              backgroundColor: '#eff6ff',
-              border: '1px solid #bfdbfe',
-              borderRadius: '8px',
-              padding: '1rem',
-              marginBottom: '1.5rem'
-            }}>
-              <h3 style={{
-                fontWeight: '600',
-                color: '#1e3a8a',
-                marginBottom: '0.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}>
-                <Calendar style={{ width: '1rem', height: '1rem' }} />
+            {/* Preview */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <h3 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-blue-600" />
                 สรุปการตั้งค่า
               </h3>
-              <div style={{ fontSize: '0.875rem', lineHeight: '1.5' }}>
-                <div><strong>ชื่อ:</strong> {formData.name || 'ยังไม่ระบุ'}</div>
-                <div><strong>Batch Size:</strong> {formData.batchSize} อีเมล/รอบ</div>
-                <div><strong>กำหนดเวลา:</strong> {getScheduleDescription()}</div>
-                <div><strong>ช่วงวันที่:</strong> {formData.startDate} {formData.endDate ? `ถึง ${formData.endDate}` : 'ไม่จำกัด'}</div>
+              <div className="text-sm leading-6 space-y-1">
+                {" "}
+                {/* เพิ่ม space-y-1 ให้แต่ละบรรทัดห่างกันนิดนึง */}
+                {/* เปลี่ยนสีหัวข้อเป็นน้ำเงินเข้ม (text-blue-800) และเนื้อหาเป็นสีเทาเข้ม (text-gray-700) */}
+                <div className="text-gray-700">
+                  <strong className="text-blue-800">ชื่อ:</strong>{" "}
+                  {formData.name || "ยังไม่ระบุ"}
+                </div>
+                <div className="text-gray-700">
+                  <strong className="text-blue-800">Batch Size:</strong>{" "}
+                  {formData.batchSize} อีเมล/รอบ
+                </div>
+                <div className="text-gray-700">
+                  <strong className="text-blue-800">กำหนดเวลา:</strong>{" "}
+                  {getScheduleDescription()}
+                </div>
+                <div className="text-gray-700">
+                  <strong className="text-blue-800">ช่วงวันที่:</strong>{" "}
+                  {formData.startDate}{" "}
+                  {formData.endDate ? `ถึง ${formData.endDate}` : "ไม่จำกัด"}
+                </div>
               </div>
             </div>
 
             {/* Actions */}
-            <div style={{
-              display: 'flex',
-              gap: '0.75rem',
-              paddingTop: '1rem',
-              borderTop: '1px solid #e5e7eb'
-            }}>
+            <div className="flex gap-3 pt-4 border-t border-gray-200">
               <button
                 type="button"
                 onClick={onClose}
-                style={{
-                  flex: 1,
-                  padding: '0.75rem 1rem',
-                  backgroundColor: '#f3f4f6',
-                  color: '#374151',
-                  borderRadius: '8px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '1rem',
-                  fontWeight: '500',
-                  transition: 'background-color 0.2s'
-                }}
-                onMouseOver={(e) => e.target.style.backgroundColor = '#e5e7eb'}
-                onMouseOut={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg border-none cursor-pointer text-base font-medium transition-colors hover:bg-gray-200"
               >
                 ยกเลิก
               </button>
               <button
                 type="submit"
-                style={{
-                  flex: 1,
-                  padding: '0.75rem 1rem',
-                  backgroundColor: '#2563eb',
-                  color: '#ffffff',
-                  borderRadius: '8px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '1rem',
-                  fontWeight: '500',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  transition: 'background-color 0.2s'
-                }}
-                onMouseOver={(e) => e.target.style.backgroundColor = '#1d4ed8'}
-                onMouseOut={(e) => e.target.style.backgroundColor = '#2563eb'}
+                className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg border-none cursor-pointer text-base font-medium flex items-center justify-center gap-2 transition-colors hover:bg-blue-700"
               >
-                <Save style={{ width: '1rem', height: '1rem' }} />
-                บันทึก
+                <Save className="w-4 h-4" />
+                {editScheduler ? 'อัปเดต' : 'บันทึก'}
               </button>
             </div>
           </form>
