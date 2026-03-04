@@ -35,6 +35,36 @@ model EmailAccount {
   emails     Email[]
 }
 
+model BatchScheduler {
+  id           String         @id @default(uuid())
+  name         String
+  batchSize    Int
+  scheduleType ScheduleType
+  customHour   Int?
+  customMinute Int?
+  startDate    DateTime
+  endDate      DateTime?
+  isActive     Boolean        @default(true)
+  lastRunAt    DateTime?
+  nextRunAt    DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  batchRuns    BatchRun[]
+}
+
+model BatchRun {
+  id              String         @id @default(uuid())
+  schedulerId     String
+  batchNumber     Int
+  status          BatchRunStatus @default(PENDING)
+  emailsProcessed Int            @default(0)
+  startedAt       DateTime?
+  completedAt     DateTime?
+  errorMessage    String?
+  createdAt       DateTime       @default(now())
+  scheduler       BatchScheduler @relation(fields: [schedulerId], references: [id])
+}
+
 model Attachment {
   id            String     @id @default(uuid())
   emailId       String
@@ -59,4 +89,17 @@ enum AccountStatus {
   ACTIVE
   INACTIVE
   ERROR
+}
+
+enum ScheduleType {
+  DAILY
+  HOURLY
+  CUSTOM
+}
+
+enum BatchRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
 }

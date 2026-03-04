@@ -26,6 +26,7 @@
     "mailparser": "^3.9.1",
     "mammoth": "^1.11.0",
     "multer": "^2.0.2",
+    "node-cron": "^4.2.1",
     "node-fetch": "^3.3.2",
     "pdf-parse": "^1.1.0",
     "pdf-poppler": "^0.2.3",

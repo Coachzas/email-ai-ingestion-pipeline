@@ -5,7 +5,7 @@ const path = require("path");
 const prisma = require("../utils/prisma");
 
 //ฟังก์ชันสำหรับเชื่อมต่อและดึงข้อมูลอีเมล ผ่านไลบรารีที่ชื่อว่า Imapflow
-async function fetchEmails(startDate, endDate, previewMode = false, accountConfig = null) {
+async function fetchEmails(startDate, endDate, previewMode = false, accountConfig = null, options = {}) {
   const config = accountConfig || {
     host: process.env.IMAP_HOST,
     port: process.env.IMAP_PORT,
@@ -15,6 +15,10 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
       pass: process.env.IMAP_PASS,
     },
   };
+
+  const limit = Number.isFinite(options.limit) ? Math.max(0, options.limit) : null;
+  const returnMeta = !!options.returnMeta;
+  const log = typeof options.logger === 'function' ? options.logger : console.log;
 
   const client = new ImapFlow({
     host: config.host,
@@ -32,6 +36,7 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
     await client.mailboxOpen("INBOX");
 
     let searchQuery = { all: true };
+    log(`📧 fetchEmails params: startDate=${startDate || '-'} endDate=${endDate || '-'} previewMode=${previewMode}`);
     if (startDate || endDate) {
       searchQuery = {};
       if (startDate) {
@@ -54,6 +59,8 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
       }
     }
 
+    log(`📧 IMAP searchQuery: ${JSON.stringify(searchQuery)}`);
+
     // ดึง UID ของอีเมลตามเงื่อนไข
     const uids = await client.search(searchQuery);
     let uidArray = Array.isArray(uids)
@@ -65,6 +72,8 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
           : [];
 
     const lastUids = uidArray;
+
+    log(`📧 IMAP search result UIDs: ${lastUids.length}`);
 
     // ถ้าเป็น preview mode ให้กรองเฉพาะอีเมลที่ยังไม่ได้บันทึก
     if (previewMode) {
@@ -153,7 +162,11 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
     }
 
     // ดึงอีเมลทีละฉบับตาม UID ที่ได้มา (normal mode)
-    for (const uid of lastUids) {
+    const uidsToFetch = limit !== null ? lastUids.slice(0, limit) : lastUids;
+    let savedCount = 0;
+    let existingCount = 0;
+
+    for (const uid of uidsToFetch) {
       try {
         const msg = await client.fetchOne(uid, { source: true });
         const parsed = await simpleParser(msg.source); // simpleParser จะทำหน้าที่ ถอดรหัส ให้กลายเป็น Object
@@ -176,7 +189,10 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
         const exists = await prisma.email.findUnique({
           where: { imapUid: uid },
         });
-        if (exists) continue;
+        if (exists) {
+          existingCount += 1;
+          continue;
+        }
 
         const email = await prisma.email.create({
           // นำข้อมูลไป Insert ลงในตาราง email
@@ -189,6 +205,8 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
             accountId: accountConfig?.id || null,
           },
         });
+
+        savedCount += 1;
 
         // มี attachments?
         if (parsed.attachments?.length) {
@@ -209,10 +227,14 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
                   filePath,
                 },
               });
-            } catch (fileErr) {}
+            } catch (fileErr) {
+              log(`❌ Attachment save failed (uid=${uid}, filename=${file?.filename || 'unknown'}): ${fileErr?.message || fileErr}`);
+            }
           }
         }
-      } catch (emailErr) {}
+      } catch (emailErr) {
+        log(`❌ Email fetch/parse/save failed (uid=${uid}): ${emailErr?.message || emailErr}`);
+      }
     }
     await client.logout(); // ปิด Session
 
@@ -226,12 +248,24 @@ async function fetchEmails(startDate, endDate, previewMode = false, accountConfi
       dateFilter.lte.setHours(23, 59, 59, 999);
     }
 
-    return await prisma.email.findMany({
+    const emailIds = await prisma.email.findMany({
       where: {
         receivedAt: Object.keys(dateFilter).length > 0 ? dateFilter : undefined,
       },
       select: { id: true },
     });
+
+    if (returnMeta) {
+      return {
+        totalUids: lastUids.length,
+        fetchedUids: uidsToFetch.length,
+        savedCount,
+        existingCount,
+        emailIds,
+      };
+    }
+
+    return emailIds;
   } catch (err) {
     throw err;
   }

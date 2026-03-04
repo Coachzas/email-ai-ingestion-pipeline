@@ -9,6 +9,7 @@ const emailProgressRoutes = require('./routes/email-progress.routes');
 const accountRoutes = require('./routes/account.routes');
 const geminiRoutes = require('./routes/gemini.routes');
 const tokenUsageRoutes = require('./routes/token-usage.routes');
+const batchSchedulerRoutes = require('./routes/batchScheduler.routes');
 // Note: Removed legacy email.routes - not used in current system
 
 const path = require('path');
@@ -34,6 +35,8 @@ app.use('/api/accounts', accountRoutes);
 app.use('/api/gemini', geminiRoutes);
 // Token Usage routes
 app.use('/api/token-usage', tokenUsageRoutes);
+// Batch Scheduler routes
+app.use('/api/batch-schedulers', batchSchedulerRoutes);
 
 // default page
 app.get('/', (req, res) => {

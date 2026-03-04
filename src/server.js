@@ -1,5 +1,6 @@
 require('dotenv').config();
 const app = require('./app');
+const { initializeSchedulers } = require('./controllers/batchScheduler.controller');
 
 const PORT = process.env.PORT || 4000;
 
@@ -31,7 +32,15 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log('📋 Global error handlers installed - server will not crash on unhandled rejections');
+  
+  // Initialize batch schedulers
+  try {
+    await initializeSchedulers();
+    console.log('⏰ Batch schedulers initialized successfully');
+  } catch (error) {
+    console.error('❌ Failed to initialize batch schedulers:', error);
+  }
 });

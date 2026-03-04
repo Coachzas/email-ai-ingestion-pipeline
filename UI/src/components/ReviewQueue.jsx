@@ -34,7 +34,7 @@ const formatDate = (dateString) => {
 
 
 
-export default function ReviewQueue({ onOpenEmail, onOpenAiAnalyzer, onItemsChange }) {
+export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
 
   const [items, setItems] = useState([])
 
@@ -44,8 +44,7 @@ export default function ReviewQueue({ onOpenEmail, onOpenAiAnalyzer, onItemsChan
 
   const [refreshTrigger, setRefreshTrigger] = useState(0)
 
-  const [ocrLimit, setOcrLimit] = useState(30)
-
+  
   
 
   // Use real-time OCR progress
@@ -192,7 +191,7 @@ export default function ReviewQueue({ onOpenEmail, onOpenAiAnalyzer, onItemsChan
 
     try {
 
-      const result = await startOcr(ocrLimit)
+      const result = await startOcr(1000) // ใช้ค่าสูงๆ เพื่อประมวลผลทั้งหมด
 
       console.log('✅ OCR started:', result)
 
@@ -486,70 +485,8 @@ export default function ReviewQueue({ onOpenEmail, onOpenAiAnalyzer, onItemsChan
 
         </div>
 
-        <div className="review-header-actions">
-
-          <div className="ocr-limit-selector">
-
-            <select 
-
-              id="ocr-limit"
-
-              value={ocrLimit} 
-
-              onChange={(e) => setOcrLimit(Number(e.target.value))}
-
-              disabled={progress.isProcessing}
-
-              className="limit-select"
-
-            >
-
-              <option value={1}>1 ไฟล์ </option>
-
-              <option value={10}>10 ไฟล์ </option>
-
-              <option value={30}>30 ไฟล์ </option>
-
-              <option value={50}>50 ไฟล์ </option>
-
-            </select>
-
-          </div>
-
-          <button 
-
-            type="button" 
-
-            className="primary-button" 
-
-            onClick={handleOcrProcess} 
-
-            disabled={progress.isProcessing || isLoading}
-
-          >
-
-            {progress.isProcessing ? '⏳ กำลังดึงข้อความ...' : `🔍 ดึงข้อความ (${ocrLimit} ไฟล์)`}
-
-          </button>
-
-          <button 
-
-            type="button" 
-
-            className="ai-analyzer-button" 
-
-            onClick={onOpenAiAnalyzer}
-
-            disabled={items.length === 0}
-
-            title="วิเคราะห์ Resume ด้วย AI"
-
-          >
-
-            🤖 AI Resume Analyzer
-
-          </button>
-
+        
+          <div className="review-header-actions">
           <button 
 
             type="button" 
