@@ -347,9 +347,9 @@ const BatchSchedulerList = ({ isOpen, onClose, onEdit }) => {
                               <div key={run.id} className="px-2 py-1 bg-gray-100 rounded text-xs border border-gray-200">
                                 <span className="font-semibold text-black">#{run.batchNumber}</span>
                                 <span className="ml-1 text-gray-600">
-                                  {run.status === 'COMPLETED' ? `✅ ${run.emailsProcessed}` : 
+                                  {run.status === 'COMPLETED' ? `✅ ${run.emailsProcessed }` : 
                                    run.status === 'FAILED' ? '❌' : '🔄'}
-                                </span>
+                                ฉบับ</span>
                                 <span className="ml-1 text-gray-400 text-2xs">
                                   {run.createdAt ? new Date(run.createdAt).toLocaleDateString('th-TH') : 'Invalid Date'}
                                 </span>

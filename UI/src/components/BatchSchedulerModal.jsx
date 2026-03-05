@@ -401,6 +401,9 @@ const BatchSchedulerModal = ({ isOpen, onClose, onSave, editScheduler }) => {
                     (24 ชั่วโมง)
                   </span>
                 </div>
+                <p className="text-xs text-gray-600 mt-2">
+                  💡 ตัวอย่าง: 14:30 = 2:30 บ่าย, 02:00 = 2 โมงเช้า
+                </p>
               </div>
             )}
 

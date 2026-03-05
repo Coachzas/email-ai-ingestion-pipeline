@@ -8,6 +8,7 @@ let batchProgress = {
   currentItem: '',
   totalEmails: 0,
   processedEmails: 0,
+  skippedEmails: 0,
   totalAttachments: 0,
   processedAttachments: 0,
   errors: 0,
@@ -88,6 +89,7 @@ async function startBatchProgress(totalEmails) {
   batchProgress.currentItem = 'กำลังเริ่มต้น...';
   batchProgress.totalEmails = totalEmails;
   batchProgress.processedEmails = 0;
+  batchProgress.skippedEmails = 0;
   batchProgress.totalAttachments = 0;
   batchProgress.processedAttachments = 0;
   batchProgress.errors = 0;
@@ -111,8 +113,23 @@ function completeBatchProgress() {
 }
 
 // Update fetching phase progress
-function updateFetchingProgress(currentEmail, total = null) {
-  updatePhaseProgress('fetching', currentEmail, total);
+function updateFetchingProgress(currentEmail, total = null, processed = null) {
+  batchProgress.currentPhase = 'fetching';
+  
+  // อัปเดต phase details
+  if (total !== null) {
+    batchProgress.phaseDetails.fetching.total = total;
+  }
+  
+  // ถ้า processed เป็นตัวเลข ให้ใช้เป็น current progress
+  if (typeof processed === 'number') {
+    batchProgress.phaseDetails.fetching.current = processed;
+  } else {
+    batchProgress.phaseDetails.fetching.current = currentEmail;
+  }
+  
+  batchProgress.currentItem = currentEmail;
+  broadcastProgress(batchProgress);
 }
 
 // Update saving phase progress
@@ -153,6 +170,7 @@ function resetProgress() {
     currentItem: '',
     totalEmails: 0,
     processedEmails: 0,
+    skippedEmails: 0,
     totalAttachments: 0,
     processedAttachments: 0,
     errors: 0,
@@ -198,7 +216,9 @@ function createBatchLogger() {
           message.includes('✅ OCR/Extract completed') ||
           message.includes('Found') && message.includes('attachments to process') ||
           message.includes('OCR completed for') ||
-          message.includes('OCR failed for')) {
+          message.includes('OCR failed for') ||
+          message.includes('File not found') ||
+          message.includes('OCR skipped for')) {
         if (message.includes('Starting automatic OCR')) {
           updateOcrProgress('กำลังเริ่ม OCR...');
         } else if (message.includes('Found') && message.includes('attachments to process')) {
@@ -217,6 +237,18 @@ function createBatchLogger() {
           if (match) {
             const fileName = match[1];
             updateOcrProgress(fileName);
+          }
+        } else if (message.includes('File not found')) {
+          const match = message.match(/File not found: (.+) -/);
+          if (match) {
+            const fileName = match[1].split('\\').pop(); // Get just filename
+            updateOcrProgress(`❌ ${fileName} (ไม่พบไฟล์)`);
+          }
+        } else if (message.includes('OCR skipped for')) {
+          const match = message.match(/OCR skipped for (.+) -/);
+          if (match) {
+            const fileName = match[1];
+            updateOcrProgress(`📄 ${fileName} (ข้าม - ไม่รองรับ)`);
           }
         } else if (message.includes('completed')) {
           const match = message.match(/Processed (\d+) attachments, (\d+) errors/);

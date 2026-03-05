@@ -1,426 +1,244 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
-import { useBatchProgress } from '../hooks/useBatchProgress.js'
-
-
-
+import { useBatchProgress } from "../hooks/useBatchProgress.js";
 const formatDate = (dateString) => {
-
   try {
-
-    return new Date(dateString).toLocaleString('th-TH', {
-
-      year: 'numeric',
-
-      month: 'short',
-
-      day: 'numeric',
-
-      hour: '2-digit',
-
-      minute: '2-digit'
-
-    })
-
+    return new Date(dateString).toLocaleString("th-TH", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   } catch {
-
-    return dateString
-
+    return dateString;
   }
-
-}
-
-
+};
 
 export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
-
-  const [items, setItems] = useState([])
-
-  const [isLoading, setIsLoading] = useState(false)
-
-  const [error, setError] = useState(null)
-
-  const [refreshTrigger, setRefreshTrigger] = useState(0)
-
-  
-  
+  const [items, setItems] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 0,
+    total: 0,
+    hasNextPage: false,
+    hasPrevPage: false,
+  });
 
   // Use batch progress
-  const { isProcessing, currentPhase, getPhaseText } = useBatchProgress()
+  const { isProcessing, currentPhase, getPhaseText } = useBatchProgress();
 
-
-
-  const [q, setQ] = useState('')
-
-  const [hasAttachments, setHasAttachments] = useState('')
-
-  const [ocrStatus, setOcrStatus] = useState('')
-
-  const [fromDate, setFromDate] = useState('')
-
-  const [toDate, setToDate] = useState('')
-
-
+  const [q, setQ] = useState("");
+  const [hasAttachments, setHasAttachments] = useState("");
+  const [ocrStatus, setOcrStatus] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   const currentAccount = useMemo(() => {
-
     if (!items.length) return null;
-
     // All emails are from the same account now, so get account info from first email
-
     return items[0]?.account || null;
-
   }, [items]);
 
-
-
   const queryString = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set("limit", "100");
+    const offset = (pagination.currentPage - 1) * 100;
+    params.set("offset", offset.toString());
 
-    const params = new URLSearchParams()
-
-    params.set('limit', '50')
-
-
-
-    if (q && q.trim().length > 0) params.set('q', q.trim())
-
-    if (hasAttachments !== '') params.set('hasAttachments', hasAttachments)
-
-    if (ocrStatus !== '') params.set('ocrStatus', ocrStatus)
-
-    if (fromDate) params.set('fromDate', fromDate)
-
+    if (q && q.trim().length > 0) params.set("q", q.trim());
+    if (hasAttachments !== "") params.set("hasAttachments", hasAttachments);
+    if (ocrStatus !== "") params.set("ocrStatus", ocrStatus);
+    if (fromDate) params.set("fromDate", fromDate);
     if (toDate) {
-
       // When toDate is the same as fromDate, we need to include the entire day
-
       // Use local timezone (Thailand UTC+7) instead of UTC
-
-      const adjustedToDate = fromDate === toDate ? `${toDate}T23:59:59.999+07:00` : toDate
-
-      params.set('toDate', adjustedToDate)
-
+      const adjustedToDate =
+        fromDate === toDate ? `${toDate}T23:59:59.999+07:00` : toDate;
+      params.set("toDate", adjustedToDate);
     }
 
-
-
-    return params.toString()
-
-  }, [q, hasAttachments, ocrStatus, fromDate, toDate, refreshTrigger])
-
-
+    return params.toString();
+  }, [
+    q,
+    hasAttachments,
+    ocrStatus,
+    fromDate,
+    toDate,
+    refreshTrigger,
+    pagination.currentPage,
+  ]);
 
   // Listen for account change events
-
   useEffect(() => {
-
     const handleAccountChange = () => {
-
-      console.log('📧 ReviewQueue: Account changed, refreshing...')
-
-      setRefreshTrigger(prev => prev + 1)
-
-    }
-
-
+      console.log("📧 ReviewQueue: Account changed, refreshing...");
+      setRefreshTrigger((prev) => prev + 1);
+    };
 
     // Create custom event for account changes
-
-    window.addEventListener('accountChanged', handleAccountChange)
-
-    
+    window.addEventListener("accountChanged", handleAccountChange);
 
     return () => {
-
-      window.removeEventListener('accountChanged', handleAccountChange)
-
-    }
-
-  }, [])
-
-
+      window.removeEventListener("accountChanged", handleAccountChange);
+    };
+  }, []);
 
   const fetchItems = useCallback(async () => {
-
-    setIsLoading(true)
-
-    setError(null)
-
-
+    setIsLoading(true);
+    setError(null);
 
     try {
-
       // Add timestamp to prevent caching
+      const cacheBuster = `&_t=${Date.now()}`;
+      const response = await fetch(
+        `/api/review/emails?${queryString}${cacheBuster}`,
+      );
+      if (!response.ok) throw new Error("Failed to fetch review emails");
 
-      const cacheBuster = `&_t=${Date.now()}`
-
-      const response = await fetch(`/api/review/emails?${queryString}${cacheBuster}`)
-
-      if (!response.ok) throw new Error('Failed to fetch review emails')
-
-
-
-      const data = await response.json()
-
-      setItems(Array.isArray(data.items) ? data.items : [])
-
+      const data = await response.json();
+      setItems(Array.isArray(data.items) ? data.items : []);
+      // Update pagination state
+      if (data.pagination) {
+        setPagination(data.pagination);
+      }
     } catch (err) {
-
-      setError(err)
-
-      setItems([])
-
+      setError(err);
+      setItems([]);
     } finally {
-
-      setIsLoading(false)
-
+      setIsLoading(false);
     }
-
-  }, [queryString])
-
-
+  }, [queryString]);
 
   const handleOcrProcess = async () => {
-    setError(null)
+    setError(null);
 
     try {
       // OCR is now part of batch process, no manual start needed
-      console.log('ℹ️ OCR is handled automatically by batch scheduler')
-      
+      console.log("ℹ️ OCR is handled automatically by batch scheduler");
+
       // Auto-refresh when batch completes
       const checkInterval = setInterval(() => {
         if (!isProcessing) {
-          clearInterval(checkInterval)
-          setRefreshTrigger(prev => prev + 1)
-          fetchItems()
+          clearInterval(checkInterval);
+          setRefreshTrigger((prev) => prev + 1);
+          fetchItems();
         }
-      }, 2000)
+      }, 2000);
 
-      return { success: true, message: 'OCR runs automatically with batch scheduler' }
-
+      return {
+        success: true,
+        message: "OCR runs automatically with batch scheduler",
+      };
     } catch (err) {
-      setError(err)
+      setError(err);
     }
-  }
-
-  const handleDeleteAllEmails = async () => {
-
-    if (!window.confirm('⚠️ ยืนยันการลบอีเมลทั้งหมด?\n\nการกระทำนี้จะลบ:\n• ข้อมูลอีเมลทั้งหมดในระบบ\n• ไฟล์แนบทั้งหมดใน storage\n• ไม่สามารถกู้คืนได้')) {
-
-      return
-
-    }
-
-
-
-    setError(null)
-
-    setIsLoading(true)
-
-
-
-    try {
-
-      const response = await fetch('/api/review/emails', {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({})
-      })
-
-
-
-      console.log('🔍 Response status:', response.status)
-
-      console.log('🔍 Response headers:', response.headers)
-
-      
-
-      if (!response.ok) {
-
-        const responseText = await response.text()
-
-        console.log('🔍 Response text (error):', responseText)
-
-        
-
-        let errorData
-
-        try {
-
-          errorData = JSON.parse(responseText)
-
-        } catch (parseErr) {
-
-          throw new Error(responseText)
-
-        }
-
-        
-
-        throw new Error(errorData.message || 'Failed to delete all emails')
-
-      }
-
-
-
-      const responseText = await response.text()
-
-      console.log('🔍 Response text (success):', responseText)
-
-      
-
-      let result
-
-      try {
-
-        result = JSON.parse(responseText)
-
-      } catch (parseErr) {
-
-        console.error('❌ JSON parse error:', parseErr)
-
-        console.error('❌ Response was:', responseText)
-
-        throw new Error('Invalid response from server')
-
-      }
-
-      
-
-      console.log('✅ Deleted all emails:', result)
-
-      
-
-      // Refresh the list
-
-      fetchItems()
-
-      
-
-      // Show success message
-
-      alert(`✅ ลบอีเมลทั้งหมดสำเร็จ!\n\nลบไป ${result.deletedCount} อีเมล\nลบไฟล์แนบ ${result.deletedAttachments} ไฟล์`)
-
-      
-
-    } catch (err) {
-
-      console.error('❌ Delete all emails error:', err)
-
-      setError(`❌ ลบอีเมลทั้งหมดไม่สำเร็จ: ${err.message}`)
-
-      alert(`❌ ลบอีเมลทั้งหมดไม่สำเร็จ:\n${err.message}`)
-
-    } finally {
-
-      setIsLoading(false)
-
-    }
-
-  }
-
-
-
-  useEffect(() => {
-
-    fetchItems()
-
-  }, [fetchItems])
-
-
-
-  // Send items to parent component when they change
-
-  useEffect(() => {
-
-    if (onItemsChange) {
-
-      onItemsChange(items)
-
-    }
-
-  }, [items, onItemsChange])
-
-
-
-  const handleDeleteEmail = async (emailId, event) => {
-
-    event.stopPropagation(); // Prevent row click
-
-    
-
-    if (!confirm('คุณแน่ใจหรือไม่ที่จะลบอีเมลนี้? การลบจะไม่สามารถกู้คืนได้')) {
-
-      return
-
-    }
-
-
-
-    try {
-
-      const response = await fetch(`/api/review/emails/${emailId}`, {
-
-        method: 'DELETE'
-
-      })
-
-      
-
-      if (!response.ok) {
-
-        const err = await response.json()
-
-        throw new Error(err.message || 'Failed to delete email')
-
-      }
-
-      
-
-      // Clear cache and fetch fresh data
-
-      await fetchItems()
-
-      alert('✅ ลบอีเมลสำเร็จ')
-
-    } catch (err) {
-
-      setError(err.message)
-
-    }
-
-  }
-
-
-
-  const getOcrStatusBadge = (status) => {
-
-    const labels = {
-
-      done: { text: 'เสร็จ', class: 'badge-done' },
-
-      partial: { text: 'บางส่วน', class: 'badge-partial' },
-
-      pending: { text: 'รอดำเนินการ', class: 'badge-pending' },
-
-      none: { text: 'ไม่มี', class: 'badge-none' },
-
-    };
-
-    const { text, class: cls } = labels[status] || labels.none;
-
-    return <span className={`badge ${cls}`}>{text}</span>;
-
   };
 
+  const handleDeleteAllEmails = async () => {
+    if (
+      !window.confirm(
+        "⚠️ ยืนยันการลบอีเมลทั้งหมด?\n\nการกระทำนี้จะลบ:\n• ข้อมูลอีเมลทั้งหมดในระบบ\n• ไฟล์แนบทั้งหมดใน storage\n• ไม่สามารถกู้คืนได้",
+      )
+    ) {
+      return;
+    }
 
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("/api/review/emails", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({}),
+      });
+
+      console.log("🔍 Response status:", response.status);
+      console.log("🔍 Response headers:", response.headers);
+
+      if (!response.ok) {
+        const responseText = await response.text();
+        console.log("🔍 Response text (error):", responseText);
+
+        let errorData;
+        try {
+          errorData = JSON.parse(responseText);
+        } catch (parseErr) {
+          throw new Error(responseText);
+        }
+
+        throw new Error(errorData.message || "Failed to delete all emails");
+      }
+
+      const responseText = await response.text();
+      console.log("🔍 Response text (success):", responseText);
+
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseErr) {
+        console.error("❌ JSON parse error:", parseErr);
+        console.error("❌ Response was:", responseText);
+        throw new Error("Invalid response from server");
+      }
+
+      console.log("✅ Deleted all emails:", result);
+
+      fetchItems();
+
+      alert(
+        `✅ ลบอีเมลทั้งหมดสำเร็จ!\n\nลบไป ${result.deletedCount} อีเมล\nลบไฟล์แนบ ${result.deletedAttachments} ไฟล์`,
+      );
+    } catch (err) {
+      console.error("❌ Delete all emails error:", err);
+      setError(`❌ ลบอีเมลทั้งหมดไม่สำเร็จ: ${err.message}`);
+      alert(`❌ ลบอีเมลทั้งหมดไม่สำเร็จ:\n${err.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
+
+  useEffect(() => {
+    if (onItemsChange) {
+      onItemsChange(items);
+    }
+  }, [items, onItemsChange]);
+
+  const handleDeleteEmail = async (emailId, event) => {
+    event.stopPropagation();
+    if (!confirm("คุณแน่ใจหรือไม่ที่จะลบอีเมลนี้? การลบจะไม่สามารถกู้คืนได้")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/review/emails/${emailId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || "Failed to delete email");
+      }
+
+      await fetchItems();
+      alert("✅ ลบอีเมลสำเร็จ");
+    } catch (err) {
+      setError(err.message);
+    }
+  };
 
   return (
-
     <>
-
       {isProcessing && (
         <div className="batch-progress-indicator">
           <div className="batch-progress-content">
@@ -436,18 +254,23 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
             <h2>📝 Email Review Center</h2>
             <p>รายการอีเมลที่บันทึกแล้วสำหรับ HR Review</p>
           </div>
-          
+
           <div className="review-header-actions">
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="attachment-ocr-btn"
-              onClick={handleDeleteAllEmails} 
+              onClick={handleDeleteAllEmails}
               disabled={isLoading || items.length === 0}
               title="ลบอีเมลทั้งหมด"
             >
               🗑️ ลบทั้งหมด
             </button>
-            <button type="button" className="attachment-ocr-btn" onClick={fetchItems} disabled={isLoading}>
+            <button
+              type="button"
+              className="attachment-ocr-btn"
+              onClick={fetchItems}
+              disabled={isLoading}
+            >
               🔄 รีเฟรช
             </button>
           </div>
@@ -493,202 +316,182 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
           <div className="review-filter">
             <label>
               ไฟล์แนบ
-              <select value={hasAttachments} onChange={(e) => setHasAttachments(e.target.value)}>
+              <select
+                value={hasAttachments}
+                onChange={(e) => setHasAttachments(e.target.value)}
+              >
                 <option value="">ทั้งหมด</option>
                 <option value="true">มีไฟล์แนบ</option>
                 <option value="false">ไม่มีไฟล์แนบ</option>
               </select>
             </label>
           </div>
-
-          <div className="review-filter">
-            <label>
-              ดึงข้อความจากไฟล์
-              <select value={ocrStatus} onChange={(e) => setOcrStatus(e.target.value)}>
-                <option value="">ทั้งหมด</option>
-                <option value="done">เสร็จ</option>
-                <option value="partial">บางส่วน</option>
-                <option value="pending">รอดำเนินการ</option>
-                <option value="none">ไม่มี</option>
-              </select>
-            </label>
-          </div>
         </div>
 
+        {error && (
+          <div className="error-message" role="alert">
+            ❌ {error.message}
+          </div>
+        )}
 
+        <div className="review-table-wrapper">
+          {currentAccount && (
+            <div className="account-section">
+              <div className="account-header-row">
+                <h3 className="account-title">📧 {currentAccount.name}</h3>
+                <span className="account-email">
+                  ({currentAccount.username})
+                </span>
+                <span className="account-count">
+                  {pagination.total || items.length} ฉบับ
+                </span>
+                <div className="pagination-buttons">
+                  <button
+                    onClick={() =>
+                      setPagination((prev) => ({
+                        ...prev,
+                        currentPage: prev.currentPage - 1,
+                      }))
+                    }
+                    disabled={!pagination.hasPrevPage}
+                    className="pagination-button"
+                  >
+                    ← ก่อนหน้า
+                  </button>
+                  <button
+                    onClick={() =>
+                      setPagination((prev) => ({
+                        ...prev,
+                        currentPage: prev.currentPage + 1,
+                      }))
+                    }
+                    disabled={!pagination.hasNextPage}
+                    className="pagination-button"
+                  >
+                    ถัดไป →
+                  </button>
+                </div>
+                
+              </div>
 
-      {error && <div className="error-message" role="alert">❌ {error.message}</div>}
-
-
-
-      <div className="review-table-wrapper">
-
-        {currentAccount && (
-
-          <div className="account-section">
-
-            <div className="account-header-row">
-
-              <h3 className="account-title">
-
-                📧 {currentAccount.name}
-
-              </h3>
-
-              <span className="account-email">({currentAccount.username})</span>
-
-              <span className="account-count">{items.length} ฉบับ</span>
-
-            </div>
-
-            
-
-            <table className="review-table">
-
-              <thead>
-
-                <tr>
-
-                  <th>วันที่รับ</th>
-
-                  <th>From</th>
-
-                  <th>Subject</th>
-
-                  <th>ไฟล์แนบ</th>
-
-                  <th>ดึงข้อความจากไฟล์</th>
-
-                  <th>จัดการ</th>
-
-                </tr>
-
-              </thead>
-
-              <tbody>
-
-                {isLoading && (
-
+              <table className="review-table">
+                <thead>
                   <tr>
-
-                    <td colSpan={6} className="review-empty">กำลังโหลด...</td>
-
+                    <th>ลำดับ</th>
+                    <th>วันที่รับ</th>
+                    <th>From</th>
+                    <th>Subject</th>
+                    <th>ไฟล์แนบ</th>
+                    <th>จัดการ</th>
                   </tr>
-
-                )}
-
-
-
-                {!isLoading && items.length === 0 && (
-
-                  <tr>
-
-                    <td colSpan={6} className="review-empty">ไม่มีอีเมลในบัญชีนี้</td>
-
-                  </tr>
-
-                )}
-
-
-
-                {!isLoading &&
-
-                  items.map((row) => (
-
-                    <tr
-
-                      key={row.id}
-
-                      className="review-row"
-
-                      onClick={() => onOpenEmail && onOpenEmail(row.id)}
-
-                      role="button"
-
-                      tabIndex={0}
-
-                      onKeyDown={(e) => {
-
-                        if (e.key === 'Enter') onOpenEmail && onOpenEmail(row.id)
-
-                      }}
-
-                    >
-
-                      <td>{formatDate(row.receivedAt)}</td>
-
-                      <td className="review-cell-muted">{row.fromEmail}</td>
-
-                      <td className="review-cell-subject">{row.subject || '(no subject)'}</td>
-
-                      <td>{row.attachmentCount}</td>
-
-                      <td>
-
-                        {getOcrStatusBadge(row.ocrStatus)}
-
+                </thead>
+                <tbody>
+                  {isLoading && (
+                    <tr>
+                      <td colSpan={7} className="review-empty">
+                        กำลังโหลด...
                       </td>
-
-                      <td onClick={(e) => e.stopPropagation()}>
-
-                        <button
-
-                          className="delete-button small"
-
-                          onClick={(e) => handleDeleteEmail(row.id, e)}
-
-                          title="ลบอีเมล"
-
-                        >
-
-                          🗑️ ลบ
-
-                        </button>
-
-                      </td>
-
                     </tr>
+                  )}
 
-                  ))}
+                  {!isLoading && items.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="review-empty">
+                        ไม่มีอีเมลในบัญชีนี้
+                      </td>
+                    </tr>
+                  )}
 
-              </tbody>
+                  {!isLoading &&
+                    items.map((row, index) => {
+                      const rowNumber =
+                        (pagination.currentPage - 1) * 100 + index + 1;
+                      return (
+                        <tr
+                          key={row.id}
+                          className="review-row"
+                          onClick={() => onOpenEmail && onOpenEmail(row.id)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter")
+                              onOpenEmail && onOpenEmail(row.id);
+                          }}
+                        >
+                          <td className="review-cell-number">{rowNumber}</td>
+                          <td>{formatDate(row.receivedAt)}</td>
+                          <td className="review-cell-muted">{row.fromEmail}</td>
+                          <td className="review-cell-subject">
+                            {row.subject || "(no subject)"}
+                          </td>
+                          <td>{row.attachmentCount}</td>
+                          <td onClick={(e) => e.stopPropagation()}>
+                            <button
+                              className="delete-button small"
+                              onClick={(e) => handleDeleteEmail(row.id, e)}
+                              title="ลบอีเมล"
+                            >
+                              🗑️ ลบ
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-            </table>
+          {!isLoading && !currentAccount && (
+            <div className="no-accounts">
+              <p>ไม่พบอีเมลในบัญชีที่เลือกใช้งาน</p>
+            </div>
+          )}
 
-          </div>
-
-        )}
-
-        
-
-        {!isLoading && !currentAccount && (
-
-          <div className="no-accounts">
-
-            <p>ไม่พบอีเมลในบัญชีที่เลือกใช้งาน</p>
-
-          </div>
-
-        )}
-
-      </div>
-
+          {/* Pagination Controls */}
+          {pagination.totalPages > 1 && (
+            <div className="pagination-controls">
+              <div className="pagination-info">
+                หน้า {pagination.currentPage} จาก {pagination.totalPages}{" "}
+                (ทั้งหมด {pagination.total} อีเมล)
+              </div>
+              <div className="pagination-buttons">
+                <button
+                  onClick={() =>
+                    setPagination((prev) => ({
+                      ...prev,
+                      currentPage: prev.currentPage - 1,
+                    }))
+                  }
+                  disabled={!pagination.hasPrevPage}
+                  className="pagination-button"
+                >
+                  ← ก่อนหน้า
+                </button>
+                <button
+                  onClick={() =>
+                    setPagination((prev) => ({
+                      ...prev,
+                      currentPage: prev.currentPage + 1,
+                    }))
+                  }
+                  disabled={!pagination.hasNextPage}
+                  className="pagination-button"
+                >
+                  ถัดไป →
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </section>
 
-      
-
       <style jsx>{`
-
         .review-section {
-
           padding: 20px;
-
         }
 
-
-
         .review-header {
-
           display: flex;
 
           justify-content: space-between;
@@ -696,43 +499,27 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
           align-items: flex-start;
 
           margin-bottom: 20px;
-
         }
 
-
-
         .review-header h2 {
-
           margin: 0;
 
           color: #333;
-
         }
 
-
-
         .review-header p {
-
           margin: 5px 0 0 0;
 
           color: #666;
-
         }
 
-
-
         .review-header-actions {
-
           display: flex;
 
           gap: 10px;
-
         }
 
-
-
         .review-filters {
-
           display: flex;
 
           gap: 15px;
@@ -740,39 +527,26 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
           margin-bottom: 20px;
 
           flex-wrap: wrap;
-
         }
 
-
-
         .review-filter {
-
           display: flex;
 
           flex-direction: column;
 
           gap: 5px;
-
         }
 
-
-
         .review-filter label {
-
           font-size: 14px;
 
           font-weight: 500;
 
           color: #333;
-
         }
 
-
-
         .review-filter input,
-
         .review-filter select {
-
           padding: 8px 12px;
 
           border: 1px solid #ddd;
@@ -780,23 +554,15 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
           border-radius: 4px;
 
           font-size: 14px;
-
         }
 
-
-
         .review-table-wrapper {
-
           overflow-x: auto;
 
           margin-top: 20px;
-
         }
 
-
-
         .account-section {
-
           margin-bottom: 30px;
 
           border: 1px solid #e1e5e9;
@@ -804,13 +570,9 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
           border-radius: 8px;
 
           overflow: hidden;
-
         }
 
-
-
         .account-header-row {
-
           background: #f8f9fa;
 
           padding: 12px 16px;
@@ -822,13 +584,9 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
           align-items: center;
 
           gap: 12px;
-
         }
 
-
-
         .account-title {
-
           margin: 0;
 
           font-size: 16px;
@@ -836,23 +594,15 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
           font-weight: 600;
 
           color: #333;
-
         }
 
-
-
         .account-email {
-
           color: #666;
 
           font-size: 14px;
-
         }
 
-
-
         .account-count {
-
           background: #007bff;
 
           color: white;
@@ -866,37 +616,25 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
           font-weight: 500;
 
           margin-left: auto;
-
         }
 
-
-
         .no-accounts {
-
           text-align: center;
 
           padding: 40px;
 
           color: #666;
-
         }
 
-
-
         .review-table {
-
           width: 100%;
 
           border-collapse: collapse;
 
           background: white;
-
         }
 
-
-
         .review-table th {
-
           background: #f8f9fa;
 
           padding: 12px 8px;
@@ -908,51 +646,31 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
           border-bottom: 1px solid #e1e5e9;
 
           font-size: 14px;
-
         }
 
-
-
         .review-table td {
-
           padding: 12px 8px;
 
           border-bottom: 1px solid #f1f3f4;
 
           font-size: 14px;
-
         }
 
-
-
         .review-row {
-
           cursor: pointer;
 
           transition: background-color 0.2s;
-
         }
-
-
 
         .review-row:hover {
-
           background-color: #f8f9fa;
-
         }
-
-
 
         .review-cell-muted {
-
           color: #666;
-
         }
 
-
-
         .review-cell-subject {
-
           max-width: 300px;
 
           overflow: hidden;
@@ -960,13 +678,9 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
           text-overflow: ellipsis;
 
           white-space: nowrap;
-
         }
 
-
-
         .review-empty {
-
           text-align: center;
 
           padding: 40px;
@@ -974,13 +688,9 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
           color: #666;
 
           font-style: italic;
-
         }
 
-
-
         .error-message {
-
           background: #f8d7da;
 
           color: #721c24;
@@ -990,13 +700,9 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
           border-radius: 4px;
 
           margin-bottom: 20px;
-
         }
 
-
-
         .badge {
-
           padding: 4px 8px;
 
           border-radius: 12px;
@@ -1004,65 +710,42 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
           font-size: 12px;
 
           font-weight: 500;
-
         }
 
-
-
         .badge-done {
-
           background: #d4edda;
 
           color: #155724;
-
         }
 
-
-
         .badge-partial {
-
           background: #fff3cd;
 
           color: #856404;
-
         }
 
-
-
         .badge-pending {
-
           background: #f8d7da;
 
           color: #721c24;
-
         }
 
-
-
         .badge-none {
-
           background: #e2e3e5;
 
           color: #6c757d;
-
         }
 
-
-
         .connection-status {
-
           color: #28a745;
 
           font-size: 12px;
 
           margin: 5px 0 0 0;
-
         }
 
-
-
-        .primary-button, .secondary-button {
-
+        .primary-button,
+        .secondary-button {
           padding: 10px 20px;
 
           border: none;
@@ -1076,107 +759,63 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
           text-decoration: none;
 
           display: inline-block;
-
         }
 
-
-
         .primary-button {
-
           background: #007bff;
 
           color: white;
-
         }
-
-
 
         .primary-button:hover {
-
           background: #0056b3;
-
         }
 
-
-
         .primary-button:disabled {
-
           opacity: 0.6;
 
           cursor: not-allowed;
-
         }
 
-
-
         .secondary-button {
-
           background: #6c757d;
 
           color: white;
-
         }
-
-
 
         .secondary-button:hover {
-
           background: #545b62;
-
         }
 
-
-
         .secondary-button:disabled {
-
           opacity: 0.6;
 
           cursor: not-allowed;
-
         }
 
-
-
         .danger-button {
-
           background: #dc3545;
 
           color: white;
-
         }
-
-
 
         .danger-button:hover {
-
           background: #c82333;
-
         }
-
-
 
         .danger-button:disabled {
-
           opacity: 0.6;
 
           cursor: not-allowed;
-
         }
-
-
 
         .secondary-button:disabled {
-
           opacity: 0.6;
 
           cursor: not-allowed;
-
         }
 
-
-
         .delete-button {
-
           padding: 6px 12px;
 
           border: none;
@@ -1194,55 +833,43 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
           background: #dc3545;
 
           color: white;
-
         }
-
-
 
         .delete-button:hover {
-
           background: #c82333;
-
         }
 
-
-
         .delete-button.small {
-
           padding: 4px 8px;
 
           font-size: 11px;
-
         }
 
-
+        .review-cell-number {
+          text-align: center;
+          font-weight: 600;
+          color: #666;
+          width: 60px;
+          min-width: 60px;
+        }
 
         .ocr-limit-selector {
-
           display: flex;
 
           align-items: center;
 
           gap: 8px;
-
         }
 
-
-
         .ocr-limit-selector label {
-
           font-size: 14px;
 
           color: #fff;
 
           font-weight: 500;
-
         }
 
-
-
         .limit-select {
-
           padding: 6px 12px;
 
           border: 1px solid #333;
@@ -1258,43 +885,27 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
           cursor: pointer;
 
           transition: border-color 0.2s;
-
         }
-
-
 
         .limit-select:hover {
-
           border-color: #007bff;
-
         }
 
-
-
         .limit-select:focus {
-
           outline: none;
 
           border-color: #007bff;
 
           box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-
         }
 
-
-
         .limit-select:disabled {
-
           opacity: 0.6;
 
           cursor: not-allowed;
-
         }
 
-
-
         .review-header-actions {
-
           display: flex;
 
           flex-direction: row;
@@ -1304,14 +915,53 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
           gap: 12px;
 
           flex-wrap: wrap;
-
         }
 
+        .pagination-controls {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-top: 20px;
+          padding: 15px;
+          background: #f8f9fa;
+          border-radius: 8px;
+          border: 1px solid #e1e5e9;
+        }
+
+        .pagination-info {
+          font-size: 14px;
+          color: #666;
+          font-weight: 500;
+        }
+
+        .pagination-buttons {
+          display: flex;
+          gap: 10px;
+        }
+
+        .pagination-button {
+          padding: 8px 16px;
+          border: 1px solid #007bff;
+          background: #007bff;
+          color: white;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 14px;
+          transition: all 0.2s;
+        }
+
+        .pagination-button:hover:not(:disabled) {
+          background: #0056b3;
+          border-color: #0056b3;
+        }
+
+        .pagination-button:disabled {
+          background: #6c757d;
+          border-color: #6c757d;
+          cursor: not-allowed;
+          opacity: 0.6;
+        }
       `}</style>
-
     </>
-
-  )
-
+  );
 }
-

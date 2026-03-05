@@ -67,7 +67,14 @@ export const useBatchProgress = () => {
     switch (state.currentPhase) {
       case 'fetching':
         currentStep = 0
-        stepProgress = 0
+        // แสดง progress จากจำนวนอีเมลที่ดึงมาแล้ว
+        const fetchingTotal = state.phaseDetails.fetching.total
+        const fetchingCurrent = state.phaseDetails.fetching.current
+        if (fetchingTotal > 0 && typeof fetchingCurrent === 'number') {
+          stepProgress = (fetchingCurrent / fetchingTotal) * 100
+        } else {
+          stepProgress = 0
+        }
         break
       case 'saving':
         currentStep = 1
@@ -77,6 +84,10 @@ export const useBatchProgress = () => {
         break
       case 'ocr':
         currentStep = 2
+        // ถ้าไม่มีไฟล์แนบ ให้ข้ามไป completed ทันที
+        if (state.totalAttachments === 0) {
+          return 100
+        }
         stepProgress = state.totalAttachments > 0 
           ? (state.processedAttachments / state.totalAttachments) * 100 
           : 0

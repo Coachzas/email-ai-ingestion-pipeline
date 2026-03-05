@@ -6,7 +6,8 @@ const {
   createBatchLogger,
   updateFetchingProgress,
   updateSavingProgress,
-  updateOcrProgress
+  updateOcrProgress,
+  incrementSkippedEmails
 } = require('./batch-progress.controller');
 
 const prisma = new PrismaClient();
@@ -358,6 +359,9 @@ async function executeBatch(scheduler) {
     
     const batchEndDate = scheduler.endDate ? new Date(scheduler.endDate) : new Date();
     let fetchResult;
+    let totalSaved = 0;
+    let totalExisting = 0;
+    
     try {
       // ใช้ fetchEmails แบบดึงจริง ไม่ใช่ preview
       const { fetchEmails } = require('../services/imap.service');
@@ -366,29 +370,50 @@ async function executeBatch(scheduler) {
       updateFetchingProgress(`กำลังดึงอีเมลจาก ${scheduler.startDate} ถึง ${batchEndDate.toLocaleDateString('th-TH')}`, scheduler.batchSize);
       
       // ดึงอีเมลและให้ service บันทึกลง DB จริง (เช็ค UID ไม่ซ้ำ)
-      // ใช้ limit เพื่อทำงานตาม batchSize
-      fetchResult = await fetchEmails(
-        scheduler.startDate,
-        batchEndDate,
-        accountConfig,
-        {
-          limit: scheduler.batchSize,
-          returnMeta: true,
-          logger: (msg) => logger.log(`[IMAP] ${msg}`)
-        }
-      );
+      // ใช้ limit เพื่อทำงานตาม batchSize และ offset เพื่อเลื่อนไปดึงอีเมลถัดไป
+      let currentOffset = 0;
+      let hasMoreEmails = true;
+      
+      while (hasMoreEmails && totalSaved < scheduler.batchSize) {
+        const remainingLimit = Math.min(scheduler.batchSize - totalSaved, 100); // ดึงทีละ 100 ฉบับ
+        
+        fetchResult = await fetchEmails(
+          scheduler.startDate,
+          batchEndDate,
+          accountConfig,
+          {
+            limit: remainingLimit,
+            offset: currentOffset,
+            returnMeta: true,
+            logger: (msg) => logger.log(`[IMAP] ${msg}`)
+          }
+        );
 
-      console.log(`📧 IMAP fetch done: totalUids=${fetchResult?.totalUids ?? 0}, fetchedUids=${fetchResult?.fetchedUids ?? 0}, saved=${fetchResult?.savedCount ?? 0}, existing=${fetchResult?.existingCount ?? 0}`);
+        console.log(`📧 IMAP fetch done: totalUids=${fetchResult?.totalUids ?? 0}, fetchedUids=${fetchResult?.fetchedUids ?? 0}, saved=${fetchResult?.savedCount ?? 0}, existing=${fetchResult?.existingCount ?? 0}`);
+        
+        totalSaved += fetchResult?.savedCount ?? 0;
+        totalExisting += fetchResult?.existingCount ?? 0;
+        currentOffset += fetchResult?.fetchedUids ?? 0;
+        
+        // ตรวจสอบว่ามีอีเมลให้ดึงต่อหรือไม่
+        hasMoreEmails = (fetchResult?.fetchedUids ?? 0) >= remainingLimit && 
+                        (fetchResult?.totalUids ?? 0) > currentOffset;
+        
+        // หยุดถ้าดึงครบ batchSize แล้ว
+        if (totalSaved >= scheduler.batchSize) {
+          break;
+        }
+      }
       
       // อัปเดต progress ช่วงการบันทึก
-      updateSavingProgress(`บันทึกอีเมลลงฐานข้อมูล`, fetchResult?.savedCount ?? 0, scheduler.batchSize);
+      updateSavingProgress(`บันทึกอีเมลลงฐานข้อมูล`, totalSaved, scheduler.batchSize);
 
     } catch (error) {
       console.error('❌ IMAP connection failed:', error);
       throw new Error(`ไม่สามารถเชื่อมต่ออีเมลได้: ${error.message}`);
     }
 
-    const emailsProcessed = fetchResult?.savedCount ?? 0;
+    const emailsProcessed = totalSaved;
 
     console.log(`📧 Batch result: saved ${emailsProcessed} new emails (batch size: ${scheduler.batchSize})`);
     if (!emailsProcessed) {
@@ -398,7 +423,26 @@ async function executeBatch(scheduler) {
       
       // 🔄 เริ่มทำ OCR/Extract อัตโนมัติสำหรับอีเมลใหม่ทั้งหมด
       console.log(`🔍 Starting automatic OCR/Extract for ${emailsProcessed} new emails...`);
-      updateOcrProgress('กำลังเริ่ม OCR/Extract', 0, 0);
+      
+      // กำหนด global functions สำหรับ update progress
+      global.updateSavingProgress = updateSavingProgress;
+      global.updateOcrProgress = updateOcrProgress;
+      global.updateSkippedEmails = incrementSkippedEmails;
+      
+      const { PrismaClient } = require('@prisma/client');
+      const prisma = new PrismaClient();
+      
+      // นับจำนวน attachments ที่ต้องทำ OCR (ให้ตรงกับ OCR service)
+      const totalAttachments = await prisma.attachment.count({
+        where: {
+          OR: [
+            { ocrStatus: null },
+            { ocrStatus: { not: 'COMPLETED' } }
+          ]
+        }
+      });
+      
+      updateOcrProgress('กำลังเริ่ม OCR/Extract', 0, totalAttachments);
       
       try {
         const { processAttachmentsForNewEmails } = require('../services/attachment-ocr.service');

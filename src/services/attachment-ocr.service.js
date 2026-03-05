@@ -30,15 +30,27 @@ async function extractTextFromPath(filePath, attachmentId = null) {
     case '.jpg':
     case '.jpeg':
     case '.png':
+    case '.webp':
     case '.bmp':
     case '.tiff':
     case '.gif':
       try {
-        const geminiService = new GeminiOcrService();
-        const ocrResult = await geminiService.extractTextFromPath(filePath);
-        return sanitizeText(ocrResult || '');
+        // ใช้ image extractor ที่มีการบันทึกข้อมูลแล้ว
+        const imageResult = await extractors.image(filePath, attachmentId);
+        const sanitizedResult = sanitizeText(imageResult || '');
+        
+        // Log ผลลัพธ์สำหรับ debugging
+        if (sanitizedResult.length > 0) {
+          console.log(`✅ OCR Success for ${path.basename(filePath)}: ${sanitizedResult.length} chars`);
+        } else {
+          console.log(`⚠️ OCR Empty for ${path.basename(filePath)} - No text found in image`);
+        }
+        
+        return sanitizedResult;
       } catch (ocrErr) {
-        return '';
+        console.error(`❌ OCR Failed for ${path.basename(filePath)}:`, ocrErr.message);
+        // คืนค่า null แทน empty string เพื่อให้รู้ว่าเกิด error
+        return null;
       }
     case '.pdf':
       try {
@@ -80,35 +92,144 @@ async function extractTextFromPath(filePath, attachmentId = null) {
   }
 }
 
+
 /**
- * Extract text from file based on type
+ * แบ่ง array เป็น chunks สำหรับ parallel processing
  */
-async function extractText(file, attachmentId = null) {
-  const { filePath, fileType } = file;
-  try {
-    if (fileType.startsWith('image/')) {
-      const geminiService = new GeminiOcrService();
-      return await geminiService.extractTextFromPath(filePath);
-    }
-    if (fileType === 'application/pdf') {
-      return await extractors.pdf(filePath, attachmentId);
-    }
-    if (fileType === 'text/csv') {
-      return await extractors.csv(filePath);
-    }
-    if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-      return await extractors.docx(filePath);
-    }
-    if (fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
-      return await extractors.xlsx(filePath);
-    }
-    if (fileType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation') {
-      return await extractors.pptx(filePath);
-    }
-    return '';
-  } catch (error) {
-    return '';
+function chunkArray(array, chunkSize) {
+  const chunks = [];
+  for (let i = 0; i < array.length; i += chunkSize) {
+    chunks.push(array.slice(i, i + chunkSize));
   }
+  return chunks;
+}
+
+/**
+ * ประมวลผล attachment เดียวพร้อม progress tracking
+ */
+async function processAttachment(attachment, index, total) {
+  const fs = require('fs');
+  
+  try {
+    if (!fs.existsSync(attachment.filePath)) {
+      console.log(`❌ File not found: ${attachment.filePath} - Marking as FAILED`);
+      await prisma.attachment.update({
+        where: { id: attachment.id },
+        data: { ocrStatus: 'FAILED' }
+      });
+      return { success: false, fileName: attachment.fileName, error: 'File not found' };
+    }
+
+    // อัปเดตสถานะเป็นกำลังประมวลผล
+    await prisma.attachment.update({
+      where: { id: attachment.id },
+      data: { ocrStatus: 'PROCESSING' }
+    });
+
+    const extractedText = await extractTextFromPath(attachment.filePath, attachment.id);
+    
+    // ตรวจสอบผลลัพธ์ก่อนบันทึก
+    if (extractedText === null) {
+      await prisma.attachment.update({
+        where: { id: attachment.id },
+        data: { ocrStatus: 'FAILED' }
+      });
+      return { success: false, fileName: attachment.fileName, error: 'OCR failed' };
+    }
+    
+    if (extractedText === '') {
+      await prisma.attachment.update({
+        where: { id: attachment.id },
+        data: { 
+          extractedText: '',
+          ocrStatus: 'COMPLETED'
+        }
+      });
+      return { success: true, fileName: attachment.fileName, textLength: 0, skipped: true };
+    }
+    
+    // บันทึกผลลัพธ์
+    await prisma.attachment.update({
+      where: { id: attachment.id },
+      data: {
+        extractedText: extractedText,
+        ocrStatus: 'COMPLETED'
+      }
+    });
+
+    return { success: true, fileName: attachment.fileName, textLength: extractedText.length };
+  } catch (error) {
+    console.error(`❌ Error processing ${attachment.fileName}:`, error.message);
+    try {
+      await prisma.attachment.update({
+        where: { id: attachment.id },
+        data: { ocrStatus: 'FAILED' }
+      });
+    } catch (updateErr) {
+      console.error(`❌ Failed to update status for ${attachment.fileName}:`, updateErr.message);
+    }
+    return { success: false, fileName: attachment.fileName, error: error.message };
+  }
+}
+
+/**
+ * ประมวลผล attachments แบบ parallel พร้อม delay ระหว่าง batches
+ */
+async function processAttachmentsInParallel(attachments, concurrency = 3, delayBetweenBatches = 500) {
+  const chunks = chunkArray(attachments, concurrency);
+  let processed = 0;
+  let errors = 0;
+  const results = [];
+
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    console.log(`📦 Processing batch ${i + 1}/${chunks.length} (${chunk.length} files)`);
+    
+    // ประมวลผล parallel ใน batch
+    const chunkPromises = chunk.map((attachment, chunkIndex) => 
+      processAttachment(attachment, processed + chunkIndex, attachments.length)
+    );
+    
+    const chunkResults = await Promise.allSettled(chunkPromises);
+    
+    // ประมวลผลผลลัพธ์จาก batch
+    chunkResults.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        const attachmentResult = result.value;
+        results.push(attachmentResult);
+        
+        if (attachmentResult.success) {
+          processed++;
+          if (attachmentResult.skipped) {
+            console.log(`📄 OCR skipped for ${attachmentResult.fileName} - no text to extract`);
+          } else {
+            console.log(`✅ OCR completed for ${attachmentResult.fileName} - ${attachmentResult.textLength} chars`);
+          }
+        } else {
+          errors++;
+          console.log(`❌ OCR failed for ${attachmentResult.fileName} - ${attachmentResult.error}`);
+        }
+      } else {
+        errors++;
+        console.log(`❌ OCR failed for ${chunk[index].fileName} - ${result.reason?.message || result.reason}`);
+        results.push({ success: false, fileName: chunk[index].fileName, error: result.reason?.message || 'Unknown error' });
+      }
+    });
+    
+    // อัปเดต progress หลัง batch
+    if (global.updateOcrProgress) {
+      const currentFileName = results[results.length - 1]?.fileName || 'Processing...';
+      global.updateOcrProgress(currentFileName, processed, attachments.length);
+    }
+    
+    // Delay ระหว่าง batches (ยกเว้น batch สุดท้าย)
+    if (i < chunks.length - 1) {
+      console.log(`⏱️ Waiting ${delayBetweenBatches}ms before next batch...`);
+      await new Promise(resolve => setTimeout(resolve, delayBetweenBatches));
+    }
+  }
+  
+  return { processed, errors, results };
 }
 
 /**
@@ -118,7 +239,7 @@ async function processAttachmentsForNewEmails() {
   try {
     const prisma = require('../utils/prisma');
     
-    // ดึง attachments ที่ยังไม่ได้ประมวลผล OCR
+    // ดึง attachments ที่ยังไม่ได้ประมวลผล OCR (เรียงตามลำดับ)
     const attachments = await prisma.attachment.findMany({
       where: {
         OR: [
@@ -134,7 +255,11 @@ async function processAttachmentsForNewEmails() {
             receivedAt: true
           }
         }
-      }
+      },
+      orderBy: [
+        { email: { receivedAt: 'asc' } }, // เรียงตามวันที่อีเมล
+        { id: 'asc' } // เรียงตาม ID ถ้าวันที่เดียวกัน
+      ]
     });
 
     console.log(`🔍 Found ${attachments.length} attachments to process for OCR`);
@@ -148,67 +273,13 @@ async function processAttachmentsForNewEmails() {
       };
     }
 
-    let processed = 0;
-    let errors = 0;
-
-    for (const attachment of attachments) {
-      try {
-        const fs = require('fs');
-        if (!fs.existsSync(attachment.filePath)) {
-          console.log(`⚠️ File not found: ${attachment.filePath}`);
-          await prisma.attachment.update({
-            where: { id: attachment.id },
-            data: { ocrStatus: 'FAILED' }
-          });
-          errors++;
-          continue;
-        }
-
-        // อัปเดตสถานะเป็นกำลังประมวลผล
-        await prisma.attachment.update({
-          where: { id: attachment.id },
-          data: { ocrStatus: 'PROCESSING' }
-        });
-
-        const extractedText = await extractTextFromPath(attachment.filePath, attachment.id);
-        
-        // ถ้า extractedText ว่าง ให้ถือว่าเสร็จแต่ไม่มีข้อความ
-        await prisma.attachment.update({
-          where: { id: attachment.id },
-          data: {
-            extractedText: extractedText || null,
-            ocrStatus: 'COMPLETED'
-          }
-        });
-
-        console.log(`✅ OCR completed for ${attachment.fileName} (Email: ${attachment.email.subject})`);
-        processed++;
-
-        // Update progress tracking
-        if (global.batchProgressUpdate) {
-          global.batchProgressUpdate({
-            processedAttachments: processed,
-            totalAttachments: attachments.length
-          });
-        }
-
-      } catch (error) {
-        console.error(`❌ OCR failed for ${attachment.fileName}:`, error.message);
-        await prisma.attachment.update({
-          where: { id: attachment.id },
-          data: {
-            ocrStatus: 'FAILED'
-          }
-        });
-        errors++;
-      }
-    }
+    const result = await processAttachmentsInParallel(attachments);
 
     return {
       success: true,
-      processed,
-      errors,
-      message: `Processed ${processed} attachments, ${errors} errors`
+      processed: result.processed,
+      errors: result.errors,
+      message: `Processed ${result.processed} attachments, ${result.errors} errors`
     };
 
   } catch (error) {

@@ -25,7 +25,7 @@ async function listEmails(req, res) {
     offset
   } = req.query || {};
 
-  const take = Math.min(Math.max(safeParseInt(limit, 50), 1), 200);
+  const take = Math.min(Math.max(safeParseInt(limit, 100), 1), 200);
   const skip = Math.max(safeParseInt(offset, 0), 0);
 
   const receivedAtFilter = {};
@@ -86,48 +86,122 @@ async function listEmails(req, res) {
 
   // We'll apply hasAttachments / ocrStatus filtering after fetching,
   // because Prisma filtering across relations would require more complex queries.
-  const emails = await prisma.email.findMany({
-    where,
-    orderBy: { receivedAt: 'desc' },
-    skip,
-    take,
-    include: {
-      account: {
-        select: {
-          id: true,
-          name: true,
-          username: true
-        }
-      },
-      attachments: {
-        select: {
-          id: true,
-          extractedText: true
-        }
-      }
-    }
-  });
-
+  
+  // Get total count for pagination (before filtering)
+  const totalCount = await prisma.email.count({ where });
+  
   const wantsHasAttachments = parseBoolean(hasAttachments);
   const wantsOcrStatus = ocrStatus ? String(ocrStatus).trim().toLowerCase() : undefined;
 
-  const items = emails
-    .map((email) => {
+  let emails, filteredTotal;
+  
+  if (wantsHasAttachments !== undefined || wantsOcrStatus !== undefined) {
+    // If there are filters, we need to fetch all emails and then filter
+    // This is less efficient but ensures correct pagination
+    const allEmails = await prisma.email.findMany({
+      where,
+      orderBy: { receivedAt: 'desc' },
+      include: {
+        account: {
+          select: {
+            id: true,
+            name: true,
+            username: true
+          }
+        },
+        attachments: {
+          select: {
+            id: true,
+            extractedText: true,
+            fileName: true,
+            filePath: true,
+            size: true
+          }
+        }
+      }
+    });
+    
+    // Apply the same filtering logic
+    const filteredEmails = allEmails
+      .map((email) => {
+        const attachmentCount = email.attachments?.length || 0;
+        const extractedCount = email.attachments?.filter((a) => a.extractedText && a.extractedText.length > 0).length || 0;
+        const pendingCount = attachmentCount - extractedCount;
+
+        let computedOcrStatus = 'none';
+        if (attachmentCount > 0) {
+          if (extractedCount === 0) computedOcrStatus = 'pending';
+          else if (extractedCount < attachmentCount) computedOcrStatus = 'partial';
+          else computedOcrStatus = 'completed';
+        }
+
+        return {
+          ...email,
+          attachmentCount,
+          extractedCount,
+          pendingCount,
+          ocrStatus: computedOcrStatus,
+          account: {
+            id: email.account.id,
+            name: email.account.name,
+            username: email.account.username
+          }
+        };
+      })
+      .filter((row) => {
+        if (wantsHasAttachments === true && row.attachmentCount === 0) return false;
+        if (wantsHasAttachments === false && row.attachmentCount > 0) return false;
+        if (wantsOcrStatus && row.ocrStatus !== wantsOcrStatus) return false;
+        return true;
+      });
+    
+    filteredTotal = filteredEmails.length;
+    
+    // Apply pagination to the filtered results
+    emails = filteredEmails.slice(skip, skip + take);
+  } else {
+    // No filters, use normal pagination
+    filteredTotal = totalCount;
+    emails = await prisma.email.findMany({
+      where,
+      orderBy: { receivedAt: 'desc' },
+      skip,
+      take,
+      include: {
+        account: {
+          select: {
+            id: true,
+            name: true,
+            username: true
+          }
+        },
+        attachments: {
+          select: {
+            id: true,
+            extractedText: true,
+            fileName: true,
+            filePath: true,
+            size: true
+          }
+        }
+      }
+    });
+    
+    // Apply the same mapping for consistency
+    emails = emails.map((email) => {
       const attachmentCount = email.attachments?.length || 0;
       const extractedCount = email.attachments?.filter((a) => a.extractedText && a.extractedText.length > 0).length || 0;
       const pendingCount = attachmentCount - extractedCount;
 
       let computedOcrStatus = 'none';
-      if (attachmentCount > 0 && pendingCount === 0) computedOcrStatus = 'done';
-      else if (attachmentCount > 0 && extractedCount === 0) computedOcrStatus = 'pending';
-      else if (attachmentCount > 0 && extractedCount > 0) computedOcrStatus = 'partial';
+      if (attachmentCount > 0) {
+        if (extractedCount === 0) computedOcrStatus = 'pending';
+        else if (extractedCount < attachmentCount) computedOcrStatus = 'partial';
+        else computedOcrStatus = 'completed';
+      }
 
       return {
-        id: email.id,
-        imapUid: email.imapUid,
-        fromEmail: email.fromEmail,
-        subject: email.subject,
-        receivedAt: email.receivedAt,
+        ...email,
         attachmentCount,
         extractedCount,
         pendingCount,
@@ -138,20 +212,27 @@ async function listEmails(req, res) {
           username: email.account.username
         }
       };
-    })
-    .filter((row) => {
-      if (wantsHasAttachments === true && row.attachmentCount === 0) return false;
-      if (wantsHasAttachments === false && row.attachmentCount > 0) return false;
-      if (wantsOcrStatus && row.ocrStatus !== wantsOcrStatus) return false;
-      return true;
     });
+  }
+
+  const total = filteredTotal;
+  const currentPage = Math.floor(skip / take) + 1;
+  const totalPages = Math.ceil(total / take);
+  const hasNextPage = currentPage < totalPages;
+  const hasPrevPage = currentPage > 1;
 
   res.json({
     status: 'success',
-    items,
-    returned: items.length,
-    limit: take,
-    offset: skip
+    items: emails,
+    pagination: {
+      total,
+      currentPage,
+      totalPages,
+      limit: take,
+      offset: skip,
+      hasNextPage,
+      hasPrevPage
+    }
   });
   
 }
