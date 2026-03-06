@@ -112,6 +112,26 @@ function completeBatchProgress() {
   broadcastProgress(batchProgress);
 }
 
+// Reset batch processing state (for stuck processes)
+function resetBatchProgress() {
+  batchProgress.isProcessing = false;
+  batchProgress.currentPhase = 'idle';
+  batchProgress.currentItem = 'พร้อมทำงาน';
+  batchProgress.totalEmails = 0;
+  batchProgress.processedEmails = 0;
+  batchProgress.skippedEmails = 0;
+  batchProgress.totalAttachments = 0;
+  batchProgress.processedAttachments = 0;
+  batchProgress.errors = 0;
+  batchProgress.startTime = null;
+  batchProgress.phaseDetails = {
+    fetching: { current: '', total: 0 },
+    saving: { current: '', total: 0 },
+    ocr: { current: '', total: 0 }
+  };
+  broadcastProgress(batchProgress);
+}
+
 // Update fetching phase progress
 function updateFetchingProgress(currentEmail, total = null, processed = null) {
   batchProgress.currentPhase = 'fetching';
@@ -159,6 +179,12 @@ function updateOcrProgress(currentFile, processed = 0, total = null) {
 // Increment error count
 function incrementErrors() {
   batchProgress.errors++;
+  broadcastProgress(batchProgress);
+}
+
+// Increment skipped emails count
+function incrementSkippedEmails() {
+  batchProgress.skippedEmails++;
   broadcastProgress(batchProgress);
 }
 
@@ -283,11 +309,10 @@ module.exports = {
   getBatchProgress,
   startBatchProgress,
   completeBatchProgress,
+  resetBatchProgress,
   updateFetchingProgress,
   updateSavingProgress,
   updateOcrProgress,
-  incrementErrors,
-  updateBatchProgress,
-  resetProgress,
+  incrementSkippedEmails,
   createBatchLogger
 };

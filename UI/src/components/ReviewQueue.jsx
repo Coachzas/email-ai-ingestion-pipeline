@@ -493,172 +493,125 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
 
         .review-header {
           display: flex;
-
           justify-content: space-between;
-
           align-items: flex-start;
-
           margin-bottom: 20px;
         }
 
         .review-header h2 {
           margin: 0;
-
           color: #333;
         }
 
         .review-header p {
           margin: 5px 0 0 0;
-
           color: #666;
         }
 
         .review-header-actions {
           display: flex;
-
           gap: 10px;
         }
 
         .review-filters {
           display: flex;
-
           gap: 15px;
-
           margin-bottom: 20px;
-
           flex-wrap: wrap;
         }
 
         .review-filter {
           display: flex;
-
           flex-direction: column;
-
           gap: 5px;
         }
 
         .review-filter label {
           font-size: 14px;
-
           font-weight: 500;
-
           color: #333;
         }
 
         .review-filter input,
         .review-filter select {
           padding: 8px 12px;
-
           border: 1px solid #ddd;
-
           border-radius: 4px;
-
           font-size: 14px;
         }
 
         .review-table-wrapper {
           overflow-x: auto;
-
           margin-top: 20px;
         }
 
         .account-section {
           margin-bottom: 30px;
-
           border: 1px solid #e1e5e9;
-
           border-radius: 8px;
-
           overflow: hidden;
         }
 
         .account-header-row {
           background: #f8f9fa;
-
           padding: 12px 16px;
-
           border-bottom: 1px solid #e1e5e9;
-
           display: flex;
-
           align-items: center;
-
           gap: 12px;
         }
 
         .account-title {
           margin: 0;
-
           font-size: 16px;
-
           font-weight: 600;
-
           color: #333;
         }
 
         .account-email {
           color: #666;
-
           font-size: 14px;
         }
 
         .account-count {
           background: #007bff;
-
           color: white;
-
           padding: 2px 8px;
-
           border-radius: 12px;
-
           font-size: 12px;
-
           font-weight: 500;
-
           margin-left: auto;
         }
 
         .no-accounts {
           text-align: center;
-
           padding: 40px;
-
           color: #666;
         }
 
         .review-table {
           width: 100%;
-
           border-collapse: collapse;
-
           background: white;
         }
 
         .review-table th {
           background: #f8f9fa;
-
           padding: 12px 8px;
-
           text-align: left;
-
           font-weight: 600;
-
           border-bottom: 1px solid #e1e5e9;
-
           font-size: 14px;
         }
 
         .review-table td {
           padding: 12px 8px;
-
           border-bottom: 1px solid #f1f3f4;
-
           font-size: 14px;
         }
 
         .review-row {
           cursor: pointer;
-
           transition: background-color 0.2s;
         }
 
@@ -672,98 +625,72 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
 
         .review-cell-subject {
           max-width: 300px;
-
           overflow: hidden;
-
           text-overflow: ellipsis;
-
           white-space: nowrap;
         }
 
         .review-empty {
           text-align: center;
-
           padding: 40px;
-
           color: #666;
-
           font-style: italic;
         }
 
         .error-message {
           background: #f8d7da;
-
           color: #721c24;
-
           padding: 12px;
-
           border-radius: 4px;
-
           margin-bottom: 20px;
         }
 
         .badge {
           padding: 4px 8px;
-
           border-radius: 12px;
-
           font-size: 12px;
-
           font-weight: 500;
         }
 
         .badge-done {
           background: #d4edda;
-
           color: #155724;
         }
 
         .badge-partial {
           background: #fff3cd;
-
           color: #856404;
         }
 
         .badge-pending {
           background: #f8d7da;
-
           color: #721c24;
         }
 
         .badge-none {
           background: #e2e3e5;
-
           color: #6c757d;
         }
 
         .connection-status {
           color: #28a745;
-
           font-size: 12px;
-
           margin: 5px 0 0 0;
         }
 
         .primary-button,
         .secondary-button {
           padding: 10px 20px;
-
           border: none;
-
           border-radius: 4px;
-
           cursor: pointer;
-
           font-size: 14px;
-
           text-decoration: none;
-
           display: inline-block;
         }
 
         .primary-button {
           background: #007bff;
-
           color: white;
         }
 
@@ -773,13 +700,11 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
 
         .primary-button:disabled {
           opacity: 0.6;
-
           cursor: not-allowed;
         }
 
         .secondary-button {
           background: #6c757d;
-
           color: white;
         }
 
@@ -789,13 +714,11 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
 
         .secondary-button:disabled {
           opacity: 0.6;
-
           cursor: not-allowed;
         }
 
         .danger-button {
           background: #dc3545;
-
           color: white;
         }
 
@@ -805,33 +728,18 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
 
         .danger-button:disabled {
           opacity: 0.6;
-
-          cursor: not-allowed;
-        }
-
-        .secondary-button:disabled {
-          opacity: 0.6;
-
           cursor: not-allowed;
         }
 
         .delete-button {
           padding: 6px 12px;
-
           border: none;
-
           border-radius: 4px;
-
           cursor: pointer;
-
           font-size: 12px;
-
           text-decoration: none;
-
           display: inline-block;
-
           background: #dc3545;
-
           color: white;
         }
 
@@ -841,7 +749,6 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
 
         .delete-button.small {
           padding: 4px 8px;
-
           font-size: 11px;
         }
 
@@ -855,35 +762,24 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
 
         .ocr-limit-selector {
           display: flex;
-
           align-items: center;
-
           gap: 8px;
         }
 
         .ocr-limit-selector label {
           font-size: 14px;
-
           color: #fff;
-
           font-weight: 500;
         }
 
         .limit-select {
           padding: 6px 12px;
-
           border: 1px solid #333;
-
           border-radius: 4px;
-
           background: #111;
-
           color: #fff;
-
           font-size: 14px;
-
           cursor: pointer;
-
           transition: border-color 0.2s;
         }
 
@@ -893,28 +789,13 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
 
         .limit-select:focus {
           outline: none;
-
           border-color: #007bff;
-
           box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
         }
 
         .limit-select:disabled {
           opacity: 0.6;
-
           cursor: not-allowed;
-        }
-
-        .review-header-actions {
-          display: flex;
-
-          flex-direction: row;
-
-          align-items: center;
-
-          gap: 12px;
-
-          flex-wrap: wrap;
         }
 
         .pagination-controls {

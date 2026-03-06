@@ -1,15 +1,8 @@
 const { ImapFlow } = require("imapflow");
-
 const { simpleParser } = require("mailparser");
-
 const fs = require("fs");
-
 const path = require("path");
-
 const prisma = require("../utils/prisma");
-
-
-
 //ฟังก์ชันสำหรับสร้าง ImapFlow connection ใหม่
 function createImapConnection(config) {
   return new ImapFlow({
@@ -88,134 +81,73 @@ async function fetchEmails(startDate, endDate, accountConfig = null, options = {
     client = await connectWithRetry(client, config);
     log(`📧 IMAP connected successfully to ${config.host}:${config.port}`);
 
-
-
     let searchQuery = { all: true };
 
     log(`📧 fetchEmails params: startDate=${startDate || '-'} endDate=${endDate || '-'}`);
 
     if (startDate || endDate) {
-
       searchQuery = {};
-
       if (startDate) {
-
         const startThaiDate = new Date(startDate);
-
         // ถอยหลังไป 1 วันสำหรับ IMAP Search เพื่อให้ครอบคลุมเวลาไทยที่เร็วกว่า UTC
-
         const safetyDate = new Date(startThaiDate);
-
         safetyDate.setDate(safetyDate.getDate() - 1);
-
         const y = safetyDate.getFullYear();
-
         const m = String(safetyDate.getMonth() + 1).padStart(2, "0");
-
         const d = String(safetyDate.getDate()).padStart(2, "0");
-
         searchQuery.since = `${y}-${m}-${d}`;
-
       }
-
       if (endDate) {
-
         const endThaiDate = new Date(endDate);
-
         endThaiDate.setDate(endThaiDate.getDate() + 1);
-
         const y = endThaiDate.getFullYear();
-
         const m = String(endThaiDate.getMonth() + 1).padStart(2, "0");
-
         const d = String(endThaiDate.getDate()).padStart(2, "0");
-
         searchQuery.before = `${y}-${m}-${d}`;
-
       }
-
     }
-
-
 
     log(`📧 IMAP searchQuery: ${JSON.stringify(searchQuery)}`);
 
-
-
     // ดึง UID ของอีเมลตามเงื่อนไข
-
     const uids = await client.search(searchQuery);
 
     let uidArray = Array.isArray(uids)
-
       ? uids
-
       : uids && typeof uids === "object"
-
         ? Object.values(uids)
-
         : uids
-
           ? [uids]
-
           : [];
 
-
-
     const lastUids = uidArray;
-
-
-
     log(`📧 IMAP search result UIDs: ${lastUids.length}`);
 
-
-
     // ดึง UID ทั้งหมดที่มีในฐานข้อมูลมาครั้งเดียว (Batch Query Optimization)
-
     log(`📧 Loading existing UIDs from database for batch check...`);
-
     const existingUids = await prisma.email.findMany({
-
       where: { imapUid: { in: lastUids } },
-
       select: { imapUid: true }
-
     });
-
     const existingUidSet = new Set(existingUids.map(e => e.imapUid));
-
     log(`📧 Found ${existingUidSet.size} existing UIDs in database`);
 
-
-
-
-
     // ดึงอีเมลทีละฉบับตาม UID ที่ได้มา (normal mode)
-
     const uidsToFetch = limit !== null ? lastUids.slice(offset, offset + limit) : lastUids.slice(offset);
-
     log(`📧 Starting to fetch ${uidsToFetch.length} emails (offset=${offset}, limit=${limit})...`);
 
     // อัปเดต fetching progress เริ่มต้น
-
     if (global.updateFetchingProgress) {
-
       global.updateFetchingProgress('กำลังดึงอีเมล...', uidsToFetch.length, 0);
-
     }
 
     let savedCount = 0;
-
     let existingCount = 0;
-
     let fetchedCount = 0; // นับจำนวนที่ดึงมาแล้ว
-
     let connectionErrors = 0;
-
     const maxConnectionErrors = 5; // จำกัด connection errors
 
     for (const uid of uidsToFetch) {
-
       try {
         // อัปเดต fetching progress ก่อนดึงอีเมล
         fetchedCount++;
@@ -241,140 +173,78 @@ async function fetchEmails(startDate, endDate, accountConfig = null, options = {
           }
         }
 
-
-
         // เช็คว่า UID นี้เคยเก็บแล้วหรือยัง (ใช้ Set สำหรับ O(1) lookup)
-
         if (existingUidSet.has(uid)) {
-
           existingCount += 1;
-
           continue;
-
         }
-
-
 
         const msg = await client.fetchOne(uid, { source: true });
-
         const parsed = await simpleParser(msg.source); // simpleParser จะทำหน้าที่ ถอดรหัส ให้กลายเป็น Object
-
-
-
-        // ตรวจสอบวันที่ตามที่ผู้ใช้เลือก (กรองเพิ่มเติม)
-
-        const receivedAt = parsed.date || new Date();
-
-        if (startDate || endDate) {
-
-          const startFilter = startDate ? new Date(startDate) : null;
-
-          const endFilter = endDate ? new Date(endDate) : null;
-
-          if (startFilter) startFilter.setHours(0, 0, 0, 0);
-
-          if (endFilter) endFilter.setHours(23, 59, 59, 999);
-
-          if (
-
-            (startFilter && receivedAt < startFilter) ||
-
-            (endFilter && receivedAt > endFilter)
-
-          )
-
-            continue;
-
+        
+        // อัปเดต fetching progress ด้วย subject หลังจาก parse เสร็จ
+        if (global.updateFetchingProgress) {
+          const subject = parsed.subject || '(ไม่มีหัวข้อ)';
+          global.updateFetchingProgress(subject, uidsToFetch.length, fetchedCount);
         }
 
-
+        // ตรวจสอบวันที่ตามที่ผู้ใช้เลือก (กรองเพิ่มเติม)
+        const receivedAt = parsed.date || new Date();
+        if (startDate || endDate) {
+          const startFilter = startDate ? new Date(startDate) : null;
+          const endFilter = endDate ? new Date(endDate) : null;
+          if (startFilter) startFilter.setHours(0, 0, 0, 0);
+          if (endFilter) endFilter.setHours(23, 59, 59, 999);
+          if (
+            (startFilter && receivedAt < startFilter) ||
+            (endFilter && receivedAt > endFilter)
+          )
+            continue;
+        }
 
         const email = await prisma.email.create({
-
           // นำข้อมูลไป Insert ลงในตาราง email
-
           data: {
-
             imapUid: uid,
-
             fromEmail: parsed.from?.text || "",
-
             subject: parsed.subject || "",
-
             bodyText: parsed.text || "",
-
             receivedAt: parsed.date || new Date(),
-
             accountId: accountConfig?.id,
-
           },
-
         });
-
-
 
         savedCount += 1;
 
-
-
         // อัปเดต progress ทุกครั้งที่บันทึกอีเมลสำเร็จ
-
         if (global.updateSavingProgress) {
-
           global.updateSavingProgress(parsed.subject || '(ไม่มีหัวข้อ)', savedCount, uidsToFetch.length);
-
         }
 
-
-
         // มี attachments?
-
         if (parsed.attachments?.length) {
-
           const dir = path.join(__dirname, "../../storage", email.id);
-
           fs.mkdirSync(dir, { recursive: true });
 
-
-
           for (const file of parsed.attachments) {
-
             try {
-
               const filePath = path.join(dir, file.filename);
-
               fs.writeFileSync(filePath, file.content); // บันทึกไฟล์จริงลงใน Disk
 
-
-
               await prisma.attachment.create({
-
                 // สร้างประวัติไฟล์แนบในฐานข้อมูล
-
                 data: {
-
                   emailId: email.id,
-
                   fileName: file.filename,
-
                   fileType: file.contentType,
-
                   filePath,
-
                   size: file.content.length, // เพิ่มขนาดไฟล์
-
                 },
-
               });
-
             } catch (fileErr) {
-
               log(`❌ Attachment save failed (uid=${uid}, filename=${file?.filename || 'unknown'}): ${fileErr?.message || fileErr}`);
-
             }
-
           }
-
         }
 
       } catch (emailErr) {
@@ -402,61 +272,32 @@ async function fetchEmails(startDate, endDate, accountConfig = null, options = {
       log(`⚠️ Logout failed: ${logoutErr.message}`);
     }
 
-
-
     const dateFilter = {};
-
     if (startDate) {
-
       dateFilter.gte = new Date(startDate);
-
       dateFilter.gte.setHours(0, 0, 0, 0);
-
     }
-
     if (endDate) {
-
       dateFilter.lte = new Date(endDate);
-
       dateFilter.lte.setHours(23, 59, 59, 999);
-
     }
-
-
 
     const emailIds = await prisma.email.findMany({
-
       where: {
-
         receivedAt: Object.keys(dateFilter).length > 0 ? dateFilter : undefined,
-
       },
-
       select: { id: true },
-
     });
 
-
-
     if (returnMeta) {
-
       return {
-
         totalUids: lastUids.length,
-
         fetchedUids: uidsToFetch.length,
-
         savedCount,
-
         existingCount,
-
         emailIds,
-
       };
-
     }
-
-
 
     return emailIds;
 
@@ -471,68 +312,38 @@ async function fetchEmails(startDate, endDate, accountConfig = null, options = {
     }
     throw err;
   }
-
 }
 
-
-
 async function fetchEmailByUid(uid, accountConfig = null) {
-
   const config = accountConfig || {
-
     host: process.env.IMAP_HOST,
-
     port: process.env.IMAP_PORT,
-
     secure: true,
-
     auth: { user: process.env.IMAP_USER, pass: process.env.IMAP_PASS },
-
   };
 
   const client = new ImapFlow({
-
     host: config.host,
-
     port: config.port,
-
     secure: config.secure,
-
     auth: config.auth,
-
   });
 
   try {
-
     await client.connect();
-
     await client.mailboxOpen("INBOX");
-
     const msg = await client.fetchOne(uid, {
-
       source: true,
-
       bodyStructure: true,
-
       envelope: true,
-
     });
 
     return await simpleParser(msg.source);
-
   } finally {
-
     try {
-
       await client.logout();
-
     } catch (e) {}
-
   }
-
 }
 
-
-
 module.exports = { fetchEmails, fetchEmailByUid };
-

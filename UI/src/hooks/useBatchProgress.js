@@ -73,6 +73,7 @@ export const useBatchProgress = () => {
         if (fetchingTotal > 0 && typeof fetchingCurrent === 'number') {
           stepProgress = (fetchingCurrent / fetchingTotal) * 100
         } else {
+          // ถ้า current เป็น string (subject) ให้แสดง progress แบบ indeterminate
           stepProgress = 0
         }
         break

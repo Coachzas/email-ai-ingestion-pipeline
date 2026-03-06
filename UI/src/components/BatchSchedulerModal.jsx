@@ -6,11 +6,13 @@ const BatchSchedulerModal = ({ isOpen, onClose, onSave, editScheduler }) => {
     name: "",
     batchSize: 100,
     scheduleType: "daily", // 'daily', 'hourly', 'custom'
-    customTime: "02:00", // for custom schedule
     customHour: 2,
     customMinute: 0,
     startDate: new Date().toISOString().split("T")[0],
     endDate: "",
+    // Custom schedule fields
+    selectedDays: [], // ['MONDAY', 'TUESDAY', ...]
+    dayTimeSlots: {}, // New: Per-day time slots {"MONDAY": [{hour: 9, minute: 0}], "TUESDAY": [...]}
   });
 
   const [now, setNow] = useState(() => new Date());
@@ -30,26 +32,28 @@ const BatchSchedulerModal = ({ isOpen, onClose, onSave, editScheduler }) => {
         name: editScheduler.name || "",
         batchSize: editScheduler.batchSize || 100,
         scheduleType: editScheduler.scheduleType?.toLowerCase() || "daily",
-        customTime: editScheduler.customHour !== null && editScheduler.customMinute !== null 
-          ? `${String(editScheduler.customHour).padStart(2, '0')}:${String(editScheduler.customMinute).padStart(2, '0')}`
-          : "02:00",
         customHour: editScheduler.customHour || 2,
         customMinute: editScheduler.customMinute || 0,
         startDate: editScheduler.startDate ? new Date(editScheduler.startDate).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
         endDate: editScheduler.endDate ? new Date(editScheduler.endDate).toISOString().split("T")[0] : "",
+        // Custom schedule fields - will be parsed from existing data or defaults
+        selectedDays: editScheduler.selectedDays || [],
+        dayTimeSlots: editScheduler.dayTimeSlots || {},
       });
     } else {
       // Reset form for new scheduler
-      setFormData({
+      const newScheduler = {
         name: "",
         batchSize: 100,
         scheduleType: "daily",
-        customTime: "00:00",
-        customHour: 0,
+        customHour: 9,
         customMinute: 0,
-        startDate: new Date().toISOString().split("T")[0],
+        startDate: new Date().toISOString().split('T')[0],
         endDate: "",
-      });
+        selectedDays: [],
+        dayTimeSlots: {}
+      };
+      setFormData(newScheduler);
     }
   }, [editScheduler, isOpen]);
 
@@ -93,6 +97,71 @@ const BatchSchedulerModal = ({ isOpen, onClose, onSave, editScheduler }) => {
     onClose();
   };
 
+  // Per-day time slots functions
+  const addDayTimeSlot = (day) => {
+    const currentDaySlots = formData.dayTimeSlots[day] || [];
+    setFormData({
+      ...formData,
+      dayTimeSlots: {
+        ...formData.dayTimeSlots,
+        [day]: [...currentDaySlots, { hour: 9, minute: 0 }]
+      }
+    });
+  };
+
+  const removeDayTimeSlot = (day, index) => {
+    const currentDaySlots = formData.dayTimeSlots[day] || [];
+    if (currentDaySlots.length > 1) {
+      const newDaySlots = currentDaySlots.filter((_, i) => i !== index);
+      setFormData({
+        ...formData,
+        dayTimeSlots: {
+          ...formData.dayTimeSlots,
+          [day]: newDaySlots
+        }
+      });
+    }
+  };
+
+  const updateDayTimeSlot = (day, index, field, value) => {
+    const currentDaySlots = formData.dayTimeSlots[day] || [];
+    const newDaySlots = [...currentDaySlots];
+    newDaySlots[index] = { ...newDaySlots[index], [field]: value };
+    setFormData({
+      ...formData,
+      dayTimeSlots: {
+        ...formData.dayTimeSlots,
+        [day]: newDaySlots
+      }
+    });
+  };
+
+  const toggleDay = (day) => {
+    if (formData.selectedDays.includes(day)) {
+      // Remove day and its time slots
+      const newDays = formData.selectedDays.filter(d => d !== day);
+      const newDayTimeSlots = { ...formData.dayTimeSlots };
+      delete newDayTimeSlots[day];
+      setFormData({ 
+        ...formData, 
+        selectedDays: newDays,
+        dayTimeSlots: newDayTimeSlots
+      });
+    } else {
+      // Add day with default time slot
+      const newDays = [...formData.selectedDays, day];
+      const newDayTimeSlots = { 
+        ...formData.dayTimeSlots,
+        [day]: [{ hour: 9, minute: 0 }] // Default to 9:00
+      };
+      setFormData({ 
+        ...formData, 
+        selectedDays: newDays,
+        dayTimeSlots: newDayTimeSlots
+      });
+    }
+  };
+
   const getScheduleDescription = () => {
     switch (formData.scheduleType) {
       case "daily":
@@ -102,7 +171,32 @@ const BatchSchedulerModal = ({ isOpen, onClose, onSave, editScheduler }) => {
       case "hourly":
         return "ทุกชั่วโมง";
       case "custom":
-        return `ทุกวันเวลา ${String(formData.customHour || 0).padStart(2, '0')}:${String(formData.customMinute || 0).padStart(2, '0')}`;
+        if (formData.selectedDays.length === 0) {
+          return "กำหนดเอง (ยังไม่เลือกวัน)";
+        }
+        const dayNames = {
+          'MONDAY': 'จันทร์', 'TUESDAY': 'อังคาร', 'WEDNESDAY': 'พุธ',
+          'THURSDAY': 'พฤหัส', 'FRIDAY': 'ศุกร์', 'SATURDAY': 'เสาร์', 'SUNDAY': 'อาทิตย์'
+        };
+        
+        // Check if we have per-day time slots
+        const hasPerDaySlots = Object.keys(formData.dayTimeSlots).length > 0;
+        
+        if (hasPerDaySlots) {
+          const descriptions = formData.selectedDays.map(day => {
+            const daySlots = formData.dayTimeSlots[day] || [];
+            const times = daySlots.length > 0 
+              ? daySlots.map(slot => 
+                  `${String(slot.hour).padStart(2, '0')}:${String(slot.minute).padStart(2, '0')}`
+                ).join(', ')
+              : 'ไม่ได้กำหนด';
+            return `${dayNames[day]}: ${times}`;
+          });
+          return descriptions.join(' | ');
+        }
+        
+        // If no per-day slots, show error
+        return "กำหนดเอง (ยังไม่ได้กำหนดเวลา)";
       default:
         return formData.scheduleType;
     }
@@ -110,9 +204,7 @@ const BatchSchedulerModal = ({ isOpen, onClose, onSave, editScheduler }) => {
 
   const nextRunAt = useMemo(() => {
     const next = new Date(now);
-    const hour = formData.customHour ?? 0;
-    const minute = formData.customMinute ?? 0;
-
+    
     if (formData.scheduleType === "hourly") {
       next.setSeconds(0, 0);
       next.setHours(now.getHours() + 1, 0, 0, 0);
@@ -133,13 +225,87 @@ const BatchSchedulerModal = ({ isOpen, onClose, onSave, editScheduler }) => {
     }
 
     if (formData.scheduleType === "custom") {
-      next.setHours(hour, minute, 0, 0);
-      if (next <= now) next.setDate(next.getDate() + 1);
-      return next;
+      // Custom schedule: find next selected day
+      if (formData.selectedDays.length === 0) {
+        return null;
+      }
+
+      const dayMap = {
+        'SUNDAY': 0, 'MONDAY': 1, 'TUESDAY': 2, 'WEDNESDAY': 3,
+        'THURSDAY': 4, 'FRIDAY': 5, 'SATURDAY': 6
+      };
+
+      // Sort selected days and convert to day numbers
+      const selectedDayNumbers = formData.selectedDays
+        .map(day => dayMap[day])
+        .sort((a, b) => a - b);
+
+      const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      const currentTime = now.getHours() * 60 + now.getMinutes();
+
+      // Find next run time
+      let nextRun = null;
+      
+      // Check if we have per-day time slots
+      const hasPerDaySlots = Object.keys(formData.dayTimeSlots).length > 0;
+      
+      if (hasPerDaySlots) {
+        // Per-day time slots logic
+        for (const dayNumber of selectedDayNumbers) {
+          const dayName = Object.keys(dayMap).find(key => dayMap[key] === dayNumber);
+          const daySlots = formData.dayTimeSlots[dayName] || [];
+          
+          if (daySlots.length === 0) continue;
+          
+          // If this day is today, check for future time slots
+          if (dayNumber === currentDay) {
+            const todaySlots = daySlots
+              .map(slot => slot.hour * 60 + slot.minute)
+              .filter(time => time > currentTime)
+              .sort((a, b) => a - b);
+            
+            if (todaySlots.length > 0) {
+              const nextSlot = todaySlots[0];
+              nextRun = new Date(now);
+              nextRun.setHours(Math.floor(nextSlot / 60), nextSlot % 60, 0, 0);
+              return nextRun;
+            }
+          } else if (dayNumber > currentDay) {
+            // Future day - use first time slot
+            const firstSlot = daySlots
+              .map(slot => slot.hour * 60 + slot.minute)
+              .sort((a, b) => a - b)[0];
+            
+            nextRun = new Date(now);
+            nextRun.setDate(nextRun.getDate() + (dayNumber - currentDay));
+            nextRun.setHours(Math.floor(firstSlot / 60), firstSlot % 60, 0, 0);
+            return nextRun;
+          }
+        }
+        
+        // If no future day found this week, go to next week
+        const nextDay = selectedDayNumbers[0];
+        const dayName = Object.keys(dayMap).find(key => dayMap[key] === nextDay);
+        const daySlots = formData.dayTimeSlots[dayName] || [];
+        
+        if (daySlots.length > 0) {
+          const firstSlot = daySlots
+            .map(slot => slot.hour * 60 + slot.minute)
+            .sort((a, b) => a - b)[0];
+          
+          nextRun = new Date(now);
+          nextRun.setDate(nextRun.getDate() + (7 - currentDay + nextDay));
+          nextRun.setHours(Math.floor(firstSlot / 60), firstSlot % 60, 0, 0);
+          return nextRun;
+        }
+      }
+      
+      // If no per-day slots, return null
+      return null;
     }
 
     return null;
-  }, [formData.customHour, formData.customMinute, formData.scheduleType, now]);
+  }, [formData.customHour, formData.customMinute, formData.scheduleType, formData.selectedDays, formData.dayTimeSlots, now]);
 
   const countdownText = useMemo(() => {
     if (!nextRunAt) return "";
@@ -358,7 +524,7 @@ const BatchSchedulerModal = ({ isOpen, onClose, onSave, editScheduler }) => {
             </div>
 
             {/* Custom Time */}
-            {(formData.scheduleType === "custom" || (formData.scheduleType === "daily" && formData.customHour !== null && formData.customMinute !== null)) && (
+            {formData.scheduleType === "daily" && (
               <div className="mb-6">
                 <label className="form-label">
                   🕐 เวลาทำงาน (ชั่วโมง:นาที)
@@ -374,7 +540,6 @@ const BatchSchedulerModal = ({ isOpen, onClose, onSave, editScheduler }) => {
                       setFormData({
                         ...formData,
                         customHour: parseInt(e.target.value),
-                        customTime: `${String(parseInt(e.target.value)).padStart(2, "0")}:${String(formData.customMinute || 0).padStart(2, "0")}`,
                       })
                     }
                     className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-base outline-none text-center"
@@ -391,7 +556,6 @@ const BatchSchedulerModal = ({ isOpen, onClose, onSave, editScheduler }) => {
                       setFormData({
                         ...formData,
                         customMinute: parseInt(e.target.value),
-                        customTime: `${String(formData.customHour || 0).padStart(2, "0")}:${String(parseInt(e.target.value)).padStart(2, "0")}`,
                       })
                     }
                     className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-base outline-none text-center"
@@ -401,8 +565,104 @@ const BatchSchedulerModal = ({ isOpen, onClose, onSave, editScheduler }) => {
                     (24 ชั่วโมง)
                   </span>
                 </div>
-                <p className="text-xs text-gray-600 mt-2">
-                  💡 ตัวอย่าง: 14:30 = 2:30 บ่าย, 02:00 = 2 โมงเช้า
+              </div>
+            )}
+
+            {/* Custom Schedule - Days and Per-Day Time Slots */}
+            {formData.scheduleType === "custom" && (
+              <div className="mb-6">
+                <label className="form-label">📅 เลือกวันทำงาน</label>
+                <div className="grid grid-cols-7 gap-2 mb-4">
+                  {[
+                    { value: 'MONDAY', label: 'จันทร์' },
+                    { value: 'TUESDAY', label: 'อังคาร' },
+                    { value: 'WEDNESDAY', label: 'พุธ' },
+                    { value: 'THURSDAY', label: 'พฤหัส' },
+                    { value: 'FRIDAY', label: 'ศุกร์' },
+                    { value: 'SATURDAY', label: 'เสาร์' },
+                    { value: 'SUNDAY', label: 'อาทิตย์' }
+                  ].map(day => (
+                    <button
+                      key={day.value}
+                      type="button"
+                      onClick={() => toggleDay(day.value)}
+                      className={`p-2 rounded-lg border text-sm font-medium transition-colors ${
+                        formData.selectedDays.includes(day.value)
+                          ? 'bg-blue-500 text-white border-blue-500'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      {day.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Per-day time slots */}
+                <div className="space-y-4">
+                  {formData.selectedDays.map(day => {
+                    const dayNames = {
+                      'MONDAY': 'จันทร์', 'TUESDAY': 'อังคาร', 'WEDNESDAY': 'พุธ',
+                      'THURSDAY': 'พฤหัส', 'FRIDAY': 'ศุกร์', 'SATURDAY': 'เสาร์', 'SUNDAY': 'อาทิตย์'
+                    };
+                    
+                    return (
+                      <div key={day} className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <label className="form-label mb-0">
+                            🕐 เวลาทำงาน {dayNames[day]}
+                          </label>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          {(formData.dayTimeSlots[day] || [{ hour: 9, minute: 0 }]).map((slot, index) => (
+                            <div key={index} className="flex gap-2 items-center">
+                              <input
+                                type="number"
+                                min="0"
+                                max="23"
+                                required
+                                value={slot.hour}
+                                onChange={(e) => updateDayTimeSlot(day, index, 'hour', parseInt(e.target.value) || 0)}
+                                className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-base outline-none text-center"
+                                placeholder="00"
+                              />
+                              <span className="text-xl text-gray-600">:</span>
+                              <input
+                                type="number"
+                                min="0"
+                                max="59"
+                                required
+                                value={slot.minute}
+                                onChange={(e) => updateDayTimeSlot(day, index, 'minute', parseInt(e.target.value) || 0)}
+                                className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-base outline-none text-center"
+                                placeholder="00"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeDayTimeSlot(day, index)}
+                                disabled={(formData.dayTimeSlots[day] || []).length === 1}
+                                className="px-3 py-2 bg-red-500 text-white rounded-lg border-none cursor-pointer text-sm font-medium transition-colors hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                              >
+                                ลบ
+                              </button>
+                            </div>
+                          ))}
+                          
+                          <button
+                            type="button"
+                            onClick={() => addDayTimeSlot(day)}
+                            className="mt-2 px-4 py-2 bg-green-500 text-white rounded-lg border-none cursor-pointer text-sm font-medium transition-colors hover:bg-green-600"
+                          >
+                            + เพิ่มเวลา {dayNames[day]}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                <p className="text-xs text-gray-600 mt-4">
+                  💡 แต่ละวันสามารถกำหนดเวลาทำงานได้หลายเวลา (เช่น จันทร์ 9:00 และ 14:00, อังคาร 10:30)
                 </p>
               </div>
             )}

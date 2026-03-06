@@ -23,7 +23,8 @@ exports.createScheduler = async (req, res) => {
       customHour,
       customMinute,
       startDate,
-      endDate
+      endDate,
+      selectedDays
     } = req.body;
 
     const parsedStartDate = startDate ? new Date(startDate) : null;
@@ -47,18 +48,39 @@ exports.createScheduler = async (req, res) => {
     const scheduleTypeEnum = scheduleType.toUpperCase();
 
     // คำนวณ next run time
-    const nextRunAt = calculateNextRunTime(scheduleTypeEnum, customHour, customMinute);
+    const nextRunAt = calculateNextRunTime(scheduleTypeEnum, customHour, customMinute, selectedDays, req.body.dayTimeSlots);
+
+    // ตรวจสอบว่ามี scheduler ที่ active อยู่แล้วหรือไม่
+    const existingActiveScheduler = await prisma.batchScheduler.findFirst({
+      where: { isActive: true }
+    });
+
+    // ถ้ามี scheduler ที่ active อยู่แล้ว ให้เป็น inactive
+    if (existingActiveScheduler) {
+      await prisma.batchScheduler.update({
+        where: { id: existingActiveScheduler.id },
+        data: { isActive: false }
+      });
+      
+      // หยุด cron job ของ scheduler เก่า
+      stopCronJob(existingActiveScheduler.id);
+      console.log(`🛑 Stopped cron job for scheduler: ${existingActiveScheduler.name}`);
+    }
 
     const scheduler = await prisma.batchScheduler.create({
       data: {
         name,
         batchSize,
         scheduleType: scheduleTypeEnum,
-        customHour: scheduleTypeEnum === 'CUSTOM' ? customHour : null,
-        customMinute: scheduleTypeEnum === 'CUSTOM' ? customMinute : null,
+        customHour: scheduleTypeEnum === 'CUSTOM' || scheduleTypeEnum === 'DAILY' ? customHour : null,
+        customMinute: scheduleTypeEnum === 'CUSTOM' || scheduleTypeEnum === 'DAILY' ? customMinute : null,
         startDate: parsedStartDate,
         endDate: parsedEndDate,
-        nextRunAt
+        nextRunAt,
+        isActive: true, // ให้ scheduler ใหม่เป็น active โดยอัตโนมัติ
+        // Store custom schedule fields as JSON
+        selectedDays: scheduleTypeEnum === 'CUSTOM' ? JSON.stringify(selectedDays || []) : null,
+        dayTimeSlots: scheduleTypeEnum === 'CUSTOM' ? JSON.stringify(req.body.dayTimeSlots || {}) : null
       }
     });
 
@@ -67,11 +89,13 @@ exports.createScheduler = async (req, res) => {
       startCronJob(scheduler);
     }
 
-    console.log(`✅ Created scheduler: ${scheduler.name}`);
+    console.log(`✅ Created scheduler: ${scheduler.name} (ACTIVE)`);
 
     res.status(201).json({
       success: true,
-      message: 'สร้าง Batch Scheduler สำเร็จ',
+      message: existingActiveScheduler 
+        ? `สร้าง Batch Scheduler "${scheduler.name}" สำเร็จ และเปลี่ยน "${existingActiveScheduler.name}" เป็น INACTIVE`
+        : `สร้าง Batch Scheduler "${scheduler.name}" สำเร็จ (ACTIVE)`,
       data: scheduler
     });
   } catch (error) {
@@ -88,18 +112,44 @@ exports.createScheduler = async (req, res) => {
 exports.getAllSchedulers = async (req, res) => {
   try {
     const schedulers = await prisma.batchScheduler.findMany({
-      include: {
-        batchRuns: {
-          orderBy: { createdAt: 'desc' },
-          take: 5
-        }
-      },
       orderBy: { createdAt: 'desc' }
     });
 
+    // Get batch runs count and recent runs for each scheduler
+    const schedulersWithStats = await Promise.all(
+      schedulers.map(async (scheduler) => {
+        // Get total count of batch runs
+        const totalRuns = await prisma.batchRun.count({
+          where: { schedulerId: scheduler.id }
+        });
+
+        // Get recent batch runs (limited to 5)
+        const recentRuns = await prisma.batchRun.findMany({
+          where: { schedulerId: scheduler.id },
+          orderBy: { createdAt: 'desc' },
+          take: 5
+        });
+
+        // Get last run info
+        const lastRun = recentRuns.length > 0 ? recentRuns[0] : null;
+
+        // Parse JSON fields for custom schedules
+        const parsedScheduler = {
+          ...scheduler,
+          batchRuns: recentRuns,
+          totalRuns,
+          lastRun,
+          selectedDays: scheduler.selectedDays ? JSON.parse(scheduler.selectedDays) : [],
+          dayTimeSlots: scheduler.dayTimeSlots ? JSON.parse(scheduler.dayTimeSlots) : {}
+        };
+
+        return parsedScheduler;
+      })
+    );
+
     res.json({
       success: true,
-      data: schedulers
+      data: schedulersWithStats
     });
   } catch (error) {
     console.error('Error fetching schedulers:', error);
@@ -122,7 +172,8 @@ exports.updateScheduler = async (req, res) => {
       customHour,
       customMinute,
       startDate,
-      endDate
+      endDate,
+      selectedDays
     } = req.body;
 
     const parsedStartDate = startDate ? new Date(startDate) : null;
@@ -146,7 +197,7 @@ exports.updateScheduler = async (req, res) => {
     const scheduleTypeEnum = scheduleType.toUpperCase();
 
     // คำนวณ next run time
-    const nextRunAt = calculateNextRunTime(scheduleTypeEnum, customHour, customMinute);
+    const nextRunAt = calculateNextRunTime(scheduleTypeEnum, customHour, customMinute, selectedDays, req.body.dayTimeSlots);
 
     // ตรวจสอบว่า scheduler มีอยู่จริง
     const existingScheduler = await prisma.batchScheduler.findUnique({
@@ -166,11 +217,14 @@ exports.updateScheduler = async (req, res) => {
         name,
         batchSize,
         scheduleType: scheduleTypeEnum,
-        customHour: scheduleTypeEnum === 'CUSTOM' ? customHour : null,
-        customMinute: scheduleTypeEnum === 'CUSTOM' ? customMinute : null,
+        customHour: scheduleTypeEnum === 'CUSTOM' || scheduleTypeEnum === 'DAILY' ? customHour : null,
+        customMinute: scheduleTypeEnum === 'CUSTOM' || scheduleTypeEnum === 'DAILY' ? customMinute : null,
         startDate: parsedStartDate,
         endDate: parsedEndDate,
-        nextRunAt
+        nextRunAt,
+        // Store custom schedule fields as JSON
+        selectedDays: scheduleTypeEnum === 'CUSTOM' ? JSON.stringify(selectedDays || []) : null,
+        dayTimeSlots: scheduleTypeEnum === 'CUSTOM' ? JSON.stringify(req.body.dayTimeSlots || {}) : null
       }
     });
 
@@ -254,7 +308,53 @@ function startCronJob(scheduler) {
       cronExpression = '0 * * * *';
       break;
     case 'CUSTOM':
-      cronExpression = `${scheduler.customMinute} ${scheduler.customHour} * * *`;
+      // For custom schedules, create proper cron expressions for each day and time slot
+      const selectedDays = scheduler.selectedDays ? JSON.parse(scheduler.selectedDays) : [];
+      const dayTimeSlots = scheduler.dayTimeSlots ? JSON.parse(scheduler.dayTimeSlots) : {};
+      
+      // Check if we have per-day time slots
+      const hasPerDaySlots = Object.keys(dayTimeSlots).length > 0;
+      
+      if (hasPerDaySlots && selectedDays.length > 0) {
+        // Use per-day time slots
+        const dayMap = {
+          'SUNDAY': 0, 'MONDAY': 1, 'TUESDAY': 2, 'WEDNESDAY': 3,
+          'THURSDAY': 4, 'FRIDAY': 5, 'SATURDAY': 6
+        };
+        
+        // Create multiple cron jobs for each day and its specific time slots
+        const tasks = [];
+        
+        for (const day of selectedDays) {
+          const cronDay = dayMap[day];
+          const daySlots = dayTimeSlots[day] || [];
+          
+          for (const timeSlot of daySlots) {
+            // Create cron expression: minute hour day_of_month month day_of_week
+            const cronExpression = `${timeSlot.minute} ${timeSlot.hour} * * ${cronDay}`;
+            
+            const task = cron.schedule(cronExpression, async () => {
+              console.log(`⏰ [${new Date().toLocaleString('th-TH')}] Custom cron job triggered for: ${scheduler.name} on ${day} at ${timeSlot.hour}:${timeSlot.minute}`);
+              await executeBatch(scheduler);
+            }, {
+              scheduled: true,
+              timezone: 'Asia/Bangkok'
+            });
+            
+            tasks.push(task);
+            console.log(`🕐 Created cron job for ${scheduler.name}: ${cronExpression} (${day} ${timeSlot.hour}:${timeSlot.minute})`);
+          }
+        }
+        
+        // Store all tasks for this scheduler
+        activeJobs.set(scheduler.id, tasks);
+        console.log(`✅ Started ${tasks.length} custom cron jobs for scheduler: ${scheduler.name} (per-day time slots on ${selectedDays.length} days)`);
+        return;
+      } else {
+        // No time slots found - this shouldn't happen with proper UI validation
+        console.error(`❌ No time slots found for custom scheduler: ${scheduler.name}`);
+        return;
+      }
       break;
     default:
       console.error(`❌ Unknown schedule type: ${scheduler.scheduleType}`);
@@ -280,11 +380,20 @@ function startCronJob(scheduler) {
 
 // หยุด cron job
 function stopCronJob(schedulerId) {
-  const job = activeJobs.get(schedulerId);
-  if (job) {
-    job.stop();
+  const tasks = activeJobs.get(schedulerId);
+  if (tasks) {
+    if (Array.isArray(tasks)) {
+      // Handle multiple tasks (custom schedules)
+      tasks.forEach(task => {
+        task.stop();
+      });
+      console.log(`Stopped ${tasks.length} cron jobs for scheduler: ${schedulerId}`);
+    } else {
+      // Handle single task (daily/hourly schedules)
+      tasks.stop();
+      console.log(`Stopped cron job for scheduler: ${schedulerId}`);
+    }
     activeJobs.delete(schedulerId);
-    console.log(`Stopped cron job for scheduler: ${schedulerId}`);
   }
 }
 
@@ -295,21 +404,33 @@ async function executeBatch(scheduler) {
   try {
     console.log(`🚀 Executing batch for scheduler: ${scheduler.name}`);
 
-    // สร้าง batch run record
+    // Create snapshot of scheduler settings at execution time
+    const selectedDays = scheduler.selectedDays ? JSON.parse(scheduler.selectedDays) : null;
+    const dayTimeSlots = scheduler.dayTimeSlots ? JSON.parse(scheduler.dayTimeSlots) : null;
+    const schedulerConfig = {
+      selectedDays,
+      dayTimeSlots
+    };
+
+    // สร้าง batch run record with snapshot
     const batchRun = await prisma.batchRun.create({
       data: {
         schedulerId: scheduler.id,
         batchNumber: await getNextBatchNumber(scheduler.id),
         status: 'RUNNING',
-        startedAt: new Date()
+        startedAt: new Date(),
+        schedulerName: scheduler.name,
+        schedulerType: scheduler.scheduleType,
+        schedulerConfig: JSON.stringify(schedulerConfig)
       }
     });
-
-    // อัปเดต last run และ next run
+    
     const nextRunAt = calculateNextRunTime(
       scheduler.scheduleType,
       scheduler.customHour,
-      scheduler.customMinute
+      scheduler.customMinute,
+      selectedDays,
+      dayTimeSlots
     );
 
     await prisma.batchScheduler.update({
@@ -432,9 +553,15 @@ async function executeBatch(scheduler) {
       const { PrismaClient } = require('@prisma/client');
       const prisma = new PrismaClient();
       
-      // นับจำนวน attachments ที่ต้องทำ OCR (ให้ตรงกับ OCR service)
+      // นับจำนวน attachments ที่ต้องทำ OCR (เฉพาะของอีเมลใหม่ที่เพิ่งบันทึก)
       const totalAttachments = await prisma.attachment.count({
         where: {
+          email: {
+            receivedAt: {
+              gte: scheduler.startDate ? new Date(scheduler.startDate) : new Date(0),
+              lte: batchEndDate
+            }
+          },
           OR: [
             { ocrStatus: null },
             { ocrStatus: { not: 'COMPLETED' } }
@@ -530,6 +657,10 @@ exports.runSchedulerNow = async (req, res) => {
       });
     }
 
+    // Reset any stuck batch processing state
+    const { resetBatchProgress } = require('./batch-progress.controller');
+    resetBatchProgress();
+
     const result = await executeBatch(scheduler);
 
     return res.json({
@@ -563,7 +694,7 @@ async function getNextBatchNumber(schedulerId) {
 }
 
 // คำนวณเวลาที่จะรันครั้งถัดไป
-function calculateNextRunTime(scheduleType, customHour, customMinute) {
+function calculateNextRunTime(scheduleType, customHour, customMinute, selectedDays = null, dayTimeSlots = null) {
   const now = new Date();
   const next = new Date(now);
 
@@ -579,48 +710,122 @@ function calculateNextRunTime(scheduleType, customHour, customMinute) {
       next.setHours(now.getHours() + 1, 0, 0, 0);
       break;
     case 'CUSTOM':
-      next.setHours(customHour !== undefined && customHour !== null ? customHour : 0, 
-                   customMinute !== undefined && customMinute !== null ? customMinute : 0, 0, 0);
-      if (next <= now) {
-        next.setDate(now.getDate() + 1);
+      // Handle custom schedule with selected days and per-day time slots
+      if (!selectedDays || selectedDays.length === 0) {
+        console.error(`❌ No selected days found for custom scheduler`);
+        return null;
       }
-      break;
+
+      const dayMap = {
+        'SUNDAY': 0, 'MONDAY': 1, 'TUESDAY': 2, 'WEDNESDAY': 3,
+        'THURSDAY': 4, 'FRIDAY': 5, 'SATURDAY': 6
+      };
+
+      // Parse selectedDays and dayTimeSlots if they're strings
+      const parsedDays = typeof selectedDays === 'string' ? JSON.parse(selectedDays) : selectedDays;
+      const parsedDaySlots = typeof dayTimeSlots === 'string' ? JSON.parse(dayTimeSlots) : dayTimeSlots;
+
+      // Check if we have per-day time slots
+      const hasPerDaySlots = parsedDaySlots && Object.keys(parsedDaySlots).length > 0;
+      
+      if (!hasPerDaySlots) {
+        console.error(`❌ No time slots found for custom scheduler`);
+        return null;
+      }
+
+      // Sort selected days and convert to day numbers
+      const selectedDayNumbers = parsedDays
+        .map(day => dayMap[day])
+        .sort((a, b) => a - b);
+
+      const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      const currentTime = now.getHours() * 60 + now.getMinutes();
+
+      // Find next run time
+      let nextRun = null;
+      
+      // Per-day time slots logic
+      for (const dayNumber of selectedDayNumbers) {
+        const dayName = Object.keys(dayMap).find(key => dayMap[key] === dayNumber);
+        const daySlots = parsedDaySlots[dayName] || [];
+        
+        if (daySlots.length === 0) continue;
+        
+        // If this day is today, check for future time slots
+        if (dayNumber === currentDay) {
+          const todaySlots = daySlots
+            .map(slot => slot.hour * 60 + slot.minute)
+            .filter(time => time > currentTime)
+            .sort((a, b) => a - b);
+          
+          if (todaySlots.length > 0) {
+            const nextSlot = todaySlots[0];
+            nextRun = new Date(now);
+            nextRun.setHours(Math.floor(nextSlot / 60), nextSlot % 60, 0, 0);
+            return nextRun;
+          }
+        } else if (dayNumber > currentDay) {
+          // Future day - use first time slot
+          const firstSlot = daySlots
+            .map(slot => slot.hour * 60 + slot.minute)
+            .sort((a, b) => a - b)[0];
+          
+          nextRun = new Date(now);
+          nextRun.setDate(nextRun.getDate() + (dayNumber - currentDay));
+          nextRun.setHours(Math.floor(firstSlot / 60), firstSlot % 60, 0, 0);
+          return nextRun;
+        }
+      }
+      
+      // If no future day found this week, go to next week
+      const nextDay = selectedDayNumbers[0];
+      const dayName = Object.keys(dayMap).find(key => dayMap[key] === nextDay);
+      const daySlots = parsedDaySlots[dayName] || [];
+      
+      if (daySlots.length > 0) {
+        const firstSlot = daySlots
+          .map(slot => slot.hour * 60 + slot.minute)
+          .sort((a, b) => a - b)[0];
+        
+        nextRun = new Date(now);
+        nextRun.setDate(nextRun.getDate() + (7 - currentDay + nextDay));
+        nextRun.setHours(Math.floor(firstSlot / 60), firstSlot % 60, 0, 0);
+        return nextRun;
+      }
+      
+      console.error(`❌ No valid time slots found for any selected day`);
+      return null;
+    default:
+      console.error(`❌ Unknown schedule type: ${scheduleType}`);
+      return null;
   }
 
   return next;
 }
 
-// เริ่ม schedulers ทั้งหมดเมื่อ server start
-exports.initializeSchedulers = async () => {
+// GET สถานะ batch ทั้งหมด
+exports.getBatchStatus = async (req, res) => {
   try {
     const schedulers = await prisma.batchScheduler.findMany({
       where: { isActive: true }
     });
 
-    console.log(`Found ${schedulers.length} active schedulers in database`);
-
-    for (const scheduler of schedulers) {
-      startCronJob(scheduler);
-    }
-
-    console.log(`✅ Initialized ${schedulers.length} schedulers from database`);
-  } catch (error) {
-    console.error('❌ Error initializing schedulers:', error);
-  }
-};
-
-// GET สถานะ batch ทั้งหมด
-exports.getBatchStatus = async (req, res) => {
-  try {
-    const schedulers = await prisma.batchScheduler.findMany({
-      where: { isActive: true },
-      include: {
-        batchRuns: {
+    // Get batch runs count and recent runs for each active scheduler
+    const schedulersWithStats = await Promise.all(
+      schedulers.map(async (scheduler) => {
+        // Get recent batch runs (limited to 5)
+        const recentRuns = await prisma.batchRun.findMany({
+          where: { schedulerId: scheduler.id },
           orderBy: { createdAt: 'desc' },
           take: 5
-        }
-      }
-    });
+        });
+
+        return {
+          ...scheduler,
+          batchRuns: recentRuns
+        };
+      })
+    );
 
     const recentRuns = await prisma.batchRun.findMany({
       orderBy: { createdAt: 'desc' },
@@ -633,7 +838,7 @@ exports.getBatchStatus = async (req, res) => {
     });
 
     const status = {
-      activeSchedulers: schedulers,
+      activeSchedulers: schedulersWithStats,
       activeJobs: Array.from(activeJobs.entries()).map(([id, job]) => ({
         schedulerId: id,
         schedulerName: schedulers.find(s => s.id === id)?.name || 'Unknown',
@@ -735,85 +940,108 @@ exports.setActiveScheduler = async (req, res) => {
   }
 };
 
-// ทดสอบการเชื่อมต่อ IMAP
-exports.testImapConnection = async (req, res) => {
+// เริ่ม schedulers ทั้งหมดเมื่อ server start
+exports.initializeSchedulers = async () => {
   try {
-    const config = {
-      host: process.env.IMAP_HOST || 'imap.gmail.com',
-      port: parseInt(process.env.IMAP_PORT) || 993,
-      secure: true,
-      username: process.env.IMAP_USER,
-      password: process.env.IMAP_PASS
-    };
-
-    if (!config.username || !config.password) {
-      return res.json({
-        success: false,
-        message: 'ไม่พบข้อมูล IMAP ใน .env',
-        config: {
-          host: config.host,
-          port: config.port,
-          hasUsername: !!config.username,
-          hasPassword: !!config.password
-        }
-      });
-    }
-
-    console.log('🔍 Testing IMAP connection...');
-    
-    // ทดสอบการเชื่อมต่อ
-    const { ImapFlow } = require('imapflow');
-    const client = new ImapFlow({
-      host: config.host,
-      port: config.port,
-      secure: config.secure,
-      auth: {
-        user: config.username,
-        pass: config.password,
-      },
-      timeout: 10000,
+    const schedulers = await prisma.batchScheduler.findMany({
+      where: { isActive: true }
     });
 
-    await client.connect();
-    await client.mailboxOpen('INBOX');
+    console.log(`Found ${schedulers.length} active schedulers in database`);
+
+    for (const scheduler of schedulers) {
+      startCronJob(scheduler);
+    }
+
+    console.log(`✅ Initialized ${schedulers.length} schedulers from database`);
+  } catch (error) {
+    console.error('❌ Error initializing schedulers:', error);
+  }
+};
+
+// ดึงประวัติการรัน batch ทั้งหมด
+exports.getBatchHistory = async (req, res) => {
+  try {
+    const { limit = 50, offset = 0 } = req.query;
     
-    // นับจำนวนอีเมลใน INBOX
-    const status = await client.status('INBOX', ['MESSAGES']);
-    const messageCount = status.messages || 0;
-    
-    await client.logout();
+    // ดึง batch runs พร้อมข้อมูล scheduler และ snapshot
+    const batchRuns = await prisma.batchRun.findMany({
+      include: {
+        scheduler: {
+          select: {
+            id: true,
+            name: true,
+            batchSize: true,
+            scheduleType: true,
+            startDate: true,
+            endDate: true,
+            selectedDays: true,
+            dayTimeSlots: true,
+            customHour: true,
+            customMinute: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: parseInt(limit),
+      skip: parseInt(offset)
+    });
+
+    // Parse JSON fields and use snapshot for historical accuracy
+    const formattedRuns = batchRuns.map(run => {
+      // Use snapshot data if available, otherwise fall back to current scheduler data
+      let selectedDays = [];
+      let dayTimeSlots = {};
+      
+      if (run.schedulerConfig) {
+        // Use snapshot from execution time
+        const config = JSON.parse(run.schedulerConfig);
+        selectedDays = config.selectedDays || [];
+        dayTimeSlots = config.dayTimeSlots || {};
+      } else if (run.scheduler) {
+        // Fallback to current scheduler data (for old runs without snapshot)
+        selectedDays = run.scheduler.selectedDays ? JSON.parse(run.scheduler.selectedDays) : [];
+        dayTimeSlots = run.scheduler.dayTimeSlots ? JSON.parse(run.scheduler.dayTimeSlots) : {};
+      }
+      
+      return {
+        ...run,
+        scheduler: run.scheduler ? {
+          ...run.scheduler,
+          selectedDays,
+          dayTimeSlots
+        } : null,
+        // Keep snapshot fields for reference
+        schedulerName: run.schedulerName,
+        schedulerType: run.schedulerType,
+        schedulerConfig: run.schedulerConfig
+      };
+    });
+
+    // Get total count for pagination
+    const totalCount = await prisma.batchRun.count();
 
     res.json({
       success: true,
-      message: 'เชื่อมต่อ IMAP สำเร็จ',
-      config: {
-        host: config.host,
-        port: config.port,
-        username: config.username
-      },
-      messageCount,
-      timestamp: new Date().toISOString()
+      data: formattedRuns,
+      pagination: {
+        total: totalCount,
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        hasMore: parseInt(offset) + parseInt(limit) < totalCount
+      }
     });
-
   } catch (error) {
-    console.error('❌ IMAP connection test failed:', error);
+    console.error('Error fetching batch history:', error);
     res.status(500).json({
       success: false,
-      message: 'ไม่สามารถเชื่อมต่อ IMAP ได้',
-      error: error.message,
-      config: {
-        host: process.env.IMAP_HOST || 'imap.gmail.com',
-        port: process.env.IMAP_PORT || 993,
-        hasUsername: !!process.env.IMAP_USER,
-        hasPassword: !!process.env.IMAP_PASS
-      }
+      message: 'เกิดข้อผิดพลาดในการดึงประวัติการรัน batch',
+      error: error.message
     });
   }
 };
 
 module.exports = {
-  activeJobs,
-  stopCronJob,
   createScheduler: exports.createScheduler,
   updateScheduler: exports.updateScheduler,
   getAllSchedulers: exports.getAllSchedulers,
@@ -821,6 +1049,6 @@ module.exports = {
   setActiveScheduler: exports.setActiveScheduler,
   initializeSchedulers: exports.initializeSchedulers,
   getBatchStatus: exports.getBatchStatus,
-  testImapConnection: exports.testImapConnection,
-  runSchedulerNow: exports.runSchedulerNow
+  runSchedulerNow: exports.runSchedulerNow,
+  getBatchHistory: exports.getBatchHistory
 };

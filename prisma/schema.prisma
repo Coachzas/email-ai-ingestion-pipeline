@@ -49,6 +49,9 @@ model BatchScheduler {
   nextRunAt    DateTime?
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
+  selectedDays String?         // JSON array of selected days for custom schedule
+  timeSlots    String?         // JSON array of time slots for custom schedule (legacy support)
+  dayTimeSlots String?         // JSON object with per-day time slots: {"MONDAY": [{hour: 9, minute: 0}], "TUESDAY": [...]}
   batchRuns    BatchRun[]
 }
 
@@ -62,6 +65,12 @@ model BatchRun {
   completedAt     DateTime?
   errorMessage    String?
   createdAt       DateTime       @default(now())
+  
+  // Snapshot of scheduler settings at the time of execution
+  schedulerName   String?
+  schedulerType   String?
+  schedulerConfig String?         // JSON string with selectedDays and dayTimeSlots at execution time
+  
   scheduler       BatchScheduler @relation(fields: [schedulerId], references: [id])
 }
 

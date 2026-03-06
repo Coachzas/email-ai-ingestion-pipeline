@@ -457,3 +457,98 @@
 {"timestamp":"2026-03-05T07:32:31.379Z","fileName":"5f09ee88ed31286bd8b6e4a8_example-janitor-resume (1).png","fileType":"png","inputTokens":2636,"outputTokens":732,"totalTokens":3368,"processingTime":6041,"extractedLength":3260}
 {"timestamp":"2026-03-05T07:32:35.374Z","fileName":"0-z6l6VDI6-photo (1).gif","fileType":"gif","inputTokens":1862,"outputTokens":395,"totalTokens":2257,"processingTime":3988,"extractedLength":1310}
 {"timestamp":"2026-03-05T07:32:37.631Z","fileName":"Mock.png","fileType":"png","inputTokens":1346,"outputTokens":25,"totalTokens":1371,"processingTime":1983,"extractedLength":60}
+{"timestamp":"2026-03-05T08:28:07.703Z","fileName":"Hamturger.jpg","fileType":"jpg","inputTokens":1862,"outputTokens":8,"totalTokens":1870,"processingTime":2292,"extractedLength":31}
+{"timestamp":"2026-03-05T08:28:07.911Z","fileName":"gmmfamily3.jpg","fileType":"jpg","inputTokens":1862,"outputTokens":44,"totalTokens":1906,"processingTime":2471,"extractedLength":89}
+{"timestamp":"2026-03-05T08:28:10.068Z","fileName":"gmmfamily2.jpg","fileType":"jpg","inputTokens":1862,"outputTokens":3,"totalTokens":1865,"processingTime":1637,"extractedLength":5}
+{"timestamp":"2026-03-05T08:28:13.431Z","fileName":"image.png","fileType":"png","inputTokens":1862,"outputTokens":528,"totalTokens":2390,"processingTime":5006,"extractedLength":2126}
+{"timestamp":"2026-03-05T08:28:19.281Z","fileName":"0-z6l6VDI6-photo.png","fileType":"png","inputTokens":1862,"outputTokens":393,"totalTokens":2255,"processingTime":4746,"extractedLength":1304}
+{"timestamp":"2026-03-05T08:28:19.415Z","fileName":"technical_resume_template_nanica.png","fileType":"png","inputTokens":1862,"outputTokens":528,"totalTokens":2390,"processingTime":4883,"extractedLength":2114}
+{"timestamp":"2026-03-05T08:28:19.717Z","fileName":"technical_resume_template_nanica.png","fileType":"png","inputTokens":1862,"outputTokens":526,"totalTokens":2388,"processingTime":5178,"extractedLength":2110}
+{"timestamp":"2026-03-05T08:28:24.059Z","fileName":"0-z6l6VDI6-photo.gif","fileType":"gif","inputTokens":1862,"outputTokens":391,"totalTokens":2253,"processingTime":3823,"extractedLength":1301}
+{"timestamp":"2026-03-05T08:28:24.112Z","fileName":"0-z6l6VDI6-photo.gif","fileType":"gif","inputTokens":1862,"outputTokens":390,"totalTokens":2252,"processingTime":3871,"extractedLength":1297}
+{"timestamp":"2026-03-05T08:28:24.267Z","fileName":"0-z6l6VDI6-photo.png","fileType":"png","inputTokens":1862,"outputTokens":396,"totalTokens":2258,"processingTime":4034,"extractedLength":1310}
+{"timestamp":"2026-03-05T08:28:28.567Z","fileName":"0-z6l6VDI6-photo.gif","fileType":"gif","inputTokens":1862,"outputTokens":390,"totalTokens":2252,"processingTime":3776,"extractedLength":1296}
+{"timestamp":"2026-03-05T08:28:28.746Z","fileName":"0-z6l6VDI6-photo.png","fileType":"png","inputTokens":1862,"outputTokens":389,"totalTokens":2251,"processingTime":3962,"extractedLength":1294}
+{"timestamp":"2026-03-05T08:28:28.866Z","fileName":"0-z6l6VDI6-photo.png","fileType":"png","inputTokens":1862,"outputTokens":390,"totalTokens":2252,"processingTime":4079,"extractedLength":1297}
+{"timestamp":"2026-03-05T08:28:31.282Z","fileName":"1.webp","fileType":"webp","inputTokens":1862,"outputTokens":8,"totalTokens":1870,"processingTime":1384,"extractedLength":31}
+{"timestamp":"2026-03-05T08:28:35.863Z","fileName":"0-z6l6VDI6-photo.png","fileType":"png","inputTokens":1862,"outputTokens":396,"totalTokens":2258,"processingTime":4064,"extractedLength":1312}
+{"timestamp":"2026-03-05T08:28:35.882Z","fileName":"0-z6l6VDI6-photo.png","fileType":"png","inputTokens":1862,"outputTokens":391,"totalTokens":2253,"processingTime":4081,"extractedLength":1299}
+{"timestamp":"2026-03-05T08:28:40.384Z","fileName":"0-z6l6VDI6-photo.png","fileType":"png","inputTokens":1862,"outputTokens":384,"totalTokens":2246,"processingTime":3991,"extractedLength":1287}
+{"timestamp":"2026-03-05T08:28:45.001Z","fileName":"0-z6l6VDI6-photo.png","fileType":"png","inputTokens":1862,"outputTokens":381,"totalTokens":2243,"processingTime":4101,"extractedLength":1278}
+{"timestamp":"2026-03-05T08:28:49.991Z","fileName":"CEO-Resume-Example.png","fileType":"png","inputTokens":3410,"outputTokens":274,"totalTokens":3684,"processingTime":3932,"extractedLength":1130}
+{"timestamp":"2026-03-05T08:28:52.895Z","fileName":"image.png","fileType":"png","inputTokens":2636,"outputTokens":759,"totalTokens":3395,"processingTime":6829,"extractedLength":3255}
+{"timestamp":"2026-03-05T08:28:53.315Z","fileName":"5f09ee88ed31286bd8b6e4a8_example-janitor-resume.png","fileType":"png","inputTokens":2636,"outputTokens":730,"totalTokens":3366,"processingTime":7245,"extractedLength":3257}
+{"timestamp":"2026-03-05T08:28:57.887Z","fileName":"0-z6l6VDI6-photo.png","fileType":"png","inputTokens":1862,"outputTokens":387,"totalTokens":2249,"processingTime":4056,"extractedLength":1289}
+{"timestamp":"2026-03-05T08:29:00.645Z","fileName":"5f09ee88ed31286bd8b6e4a8_example-janitor-resume.png","fileType":"png","inputTokens":2636,"outputTokens":759,"totalTokens":3395,"processingTime":6808,"extractedLength":3256}
+{"timestamp":"2026-03-05T08:29:00.831Z","fileName":"5f09ee88ed31286bd8b6e4a8_example-janitor-resume.png","fileType":"png","inputTokens":2636,"outputTokens":758,"totalTokens":3394,"processingTime":6998,"extractedLength":3254}
+{"timestamp":"2026-03-05T08:29:05.262Z","fileName":"0-z6l6VDI6-photo.gif","fileType":"gif","inputTokens":1862,"outputTokens":392,"totalTokens":2254,"processingTime":3907,"extractedLength":1304}
+{"timestamp":"2026-03-05T08:29:07.235Z","fileName":"image.png","fileType":"png","inputTokens":1862,"outputTokens":636,"totalTokens":2498,"processingTime":5886,"extractedLength":2389}
+{"timestamp":"2026-03-05T08:29:08.218Z","fileName":"5f09ee88ed31286bd8b6e4a8_example-janitor-resume.png","fileType":"png","inputTokens":2636,"outputTokens":760,"totalTokens":3396,"processingTime":6873,"extractedLength":3258}
+{"timestamp":"2026-03-05T08:29:12.410Z","fileName":"0-z6l6VDI6-photo.gif","fileType":"gif","inputTokens":1862,"outputTokens":392,"totalTokens":2254,"processingTime":3679,"extractedLength":1305}
+{"timestamp":"2026-03-05T08:29:19.466Z","fileName":"5f09ee88ed31286bd8b6e4a8_example-janitor-resume.png","fileType":"png","inputTokens":2636,"outputTokens":730,"totalTokens":3366,"processingTime":6539,"extractedLength":3256}
+{"timestamp":"2026-03-05T08:29:19.989Z","fileName":"5f09ee88ed31286bd8b6e4a8_example-janitor-resume.png","fileType":"png","inputTokens":2636,"outputTokens":730,"totalTokens":3366,"processingTime":7059,"extractedLength":3256}
+{"timestamp":"2026-03-05T08:29:19.992Z","fileName":"5f09ee88ed31286bd8b6e4a8_example-janitor-resume.png","fileType":"png","inputTokens":2636,"outputTokens":759,"totalTokens":3395,"processingTime":7058,"extractedLength":3255}
+{"timestamp":"2026-03-05T08:29:26.961Z","fileName":"5f09ee88ed31286bd8b6e4a8_example-janitor-resume.png","fileType":"png","inputTokens":2636,"outputTokens":758,"totalTokens":3394,"processingTime":6450,"extractedLength":3254}
+{"timestamp":"2026-03-05T08:29:29.721Z","fileName":"Mock.png","fileType":"png","inputTokens":1346,"outputTokens":25,"totalTokens":1371,"processingTime":2249,"extractedLength":60}
+{"timestamp":"2026-03-05T08:29:32.364Z","fileName":"Mock.png","fileType":"png","inputTokens":1346,"outputTokens":22,"totalTokens":1368,"processingTime":2134,"extractedLength":60}
+{"timestamp":"2026-03-05T08:29:33.710Z","fileName":"Resume.jpg","fileType":"jpg","inputTokens":3410,"outputTokens":246,"totalTokens":3656,"processingTime":3483,"extractedLength":905}
+{"timestamp":"2026-03-05T08:29:34.227Z","fileName":"เรซูเม่.webp","fileType":"webp","inputTokens":1862,"outputTokens":366,"totalTokens":2228,"processingTime":3990,"extractedLength":1096}
+{"timestamp":"2026-03-05T08:29:37.708Z","fileName":"Mock.png","fileType":"png","inputTokens":1346,"outputTokens":21,"totalTokens":1367,"processingTime":1733,"extractedLength":59}
+{"timestamp":"2026-03-05T08:29:41.700Z","fileName":"เรซูเม่.webp","fileType":"webp","inputTokens":1862,"outputTokens":375,"totalTokens":2237,"processingTime":3477,"extractedLength":1100}
+{"timestamp":"2026-03-05T08:29:42.118Z","fileName":"Resume.jpg","fileType":"jpg","inputTokens":3410,"outputTokens":246,"totalTokens":3656,"processingTime":3892,"extractedLength":905}
+{"timestamp":"2026-03-05T08:29:44.669Z","fileName":"Mock.png","fileType":"png","inputTokens":1346,"outputTokens":25,"totalTokens":1371,"processingTime":2027,"extractedLength":60}
+{"timestamp":"2026-03-05T08:29:44.671Z","fileName":"Mock.png","fileType":"png","inputTokens":1346,"outputTokens":22,"totalTokens":1368,"processingTime":2033,"extractedLength":60}
+{"timestamp":"2026-03-05T08:29:49.450Z","fileName":"0-z6l6VDI6-photo (1).gif","fileType":"gif","inputTokens":1862,"outputTokens":388,"totalTokens":2250,"processingTime":3754,"extractedLength":1305}
+{"timestamp":"2026-03-05T08:31:38.555Z","fileName":"0-z6l6VDI6-photo (1).gif","fileType":"gif","inputTokens":1862,"outputTokens":388,"totalTokens":2250,"processingTime":4171,"extractedLength":1297}
+{"timestamp":"2026-03-05T08:31:43.005Z","fileName":"0-z6l6VDI6-photo.png","fileType":"png","inputTokens":1862,"outputTokens":387,"totalTokens":2249,"processingTime":3929,"extractedLength":1289}
+{"timestamp":"2026-03-05T08:31:47.043Z","fileName":"Resume (1).jpg","fileType":"jpg","inputTokens":3410,"outputTokens":246,"totalTokens":3656,"processingTime":3518,"extractedLength":905}
+{"timestamp":"2026-03-05T08:31:48.012Z","fileName":"image.png","fileType":"png","inputTokens":1862,"outputTokens":370,"totalTokens":2232,"processingTime":4482,"extractedLength":1100}
+{"timestamp":"2026-03-05T08:31:49.904Z","fileName":"5f09ee88ed31286bd8b6e4a8_example-janitor-resume.png","fileType":"png","inputTokens":2636,"outputTokens":758,"totalTokens":3394,"processingTime":6384,"extractedLength":3254}
+{"timestamp":"2026-03-05T08:31:53.950Z","fileName":"Resume (1).jpg","fileType":"jpg","inputTokens":3410,"outputTokens":246,"totalTokens":3656,"processingTime":3524,"extractedLength":905}
+{"timestamp":"2026-03-05T08:31:56.059Z","fileName":"image.png","fileType":"png","inputTokens":1862,"outputTokens":636,"totalTokens":2498,"processingTime":5630,"extractedLength":2389}
+{"timestamp":"2026-03-05T08:31:56.157Z","fileName":"image.png","fileType":"png","inputTokens":1862,"outputTokens":636,"totalTokens":2498,"processingTime":5721,"extractedLength":2390}
+{"timestamp":"2026-03-05T08:31:59.943Z","fileName":"Resume (1).jpg","fileType":"jpg","inputTokens":3410,"outputTokens":246,"totalTokens":3656,"processingTime":3252,"extractedLength":905}
+{"timestamp":"2026-03-05T08:32:02.199Z","fileName":"image.png","fileType":"png","inputTokens":1862,"outputTokens":636,"totalTokens":2498,"processingTime":5530,"extractedLength":2389}
+{"timestamp":"2026-03-05T08:32:02.202Z","fileName":"image.png","fileType":"png","inputTokens":1862,"outputTokens":636,"totalTokens":2498,"processingTime":5524,"extractedLength":2390}
+{"timestamp":"2026-03-05T08:32:08.035Z","fileName":"image.png","fileType":"png","inputTokens":1862,"outputTokens":622,"totalTokens":2484,"processingTime":5311,"extractedLength":2401}
+{"timestamp":"2026-03-05T08:32:08.108Z","fileName":"image.png","fileType":"png","inputTokens":1862,"outputTokens":637,"totalTokens":2499,"processingTime":5378,"extractedLength":2397}
+{"timestamp":"2026-03-05T08:32:09.473Z","fileName":"image.png","fileType":"png","inputTokens":1862,"outputTokens":637,"totalTokens":2499,"processingTime":6735,"extractedLength":2391}
+{"timestamp":"2026-03-05T08:32:15.817Z","fileName":"image.png","fileType":"png","inputTokens":1862,"outputTokens":636,"totalTokens":2498,"processingTime":5813,"extractedLength":2389}
+{"timestamp":"2026-03-05T08:32:15.819Z","fileName":"image.png","fileType":"png","inputTokens":1862,"outputTokens":619,"totalTokens":2481,"processingTime":5823,"extractedLength":2400}
+{"timestamp":"2026-03-05T08:32:16.223Z","fileName":"image.png","fileType":"png","inputTokens":1862,"outputTokens":636,"totalTokens":2498,"processingTime":6235,"extractedLength":2389}
+{"timestamp":"2026-03-05T08:32:22.370Z","fileName":"image.png","fileType":"png","inputTokens":1862,"outputTokens":639,"totalTokens":2501,"processingTime":5630,"extractedLength":2395}
+{"timestamp":"2026-03-05T08:32:22.374Z","fileName":"image.png","fileType":"png","inputTokens":1862,"outputTokens":633,"totalTokens":2495,"processingTime":5641,"extractedLength":2389}
+{"timestamp":"2026-03-05T08:32:22.376Z","fileName":"image.png","fileType":"png","inputTokens":1862,"outputTokens":622,"totalTokens":2484,"processingTime":5628,"extractedLength":2406}
+{"timestamp":"2026-03-05T08:32:28.493Z","fileName":"image.png","fileType":"png","inputTokens":1862,"outputTokens":636,"totalTokens":2498,"processingTime":5602,"extractedLength":2389}
+{"timestamp":"2026-03-05T08:32:28.496Z","fileName":"image.png","fileType":"png","inputTokens":1862,"outputTokens":636,"totalTokens":2498,"processingTime":5596,"extractedLength":2389}
+{"timestamp":"2026-03-05T08:32:28.923Z","fileName":"image.png","fileType":"png","inputTokens":1862,"outputTokens":633,"totalTokens":2495,"processingTime":6016,"extractedLength":2400}
+{"timestamp":"2026-03-05T08:32:34.967Z","fileName":"image.png","fileType":"png","inputTokens":1862,"outputTokens":636,"totalTokens":2498,"processingTime":5368,"extractedLength":2389}
+{"timestamp":"2026-03-05T08:32:37.418Z","fileName":"Mock.png","fileType":"png","inputTokens":1346,"outputTokens":24,"totalTokens":1370,"processingTime":1936,"extractedLength":59}
+{"timestamp":"2026-03-05T08:32:40.866Z","fileName":"image.png","fileType":"png","inputTokens":1862,"outputTokens":545,"totalTokens":2407,"processingTime":5381,"extractedLength":1552}
+{"timestamp":"2026-03-05T08:32:46.224Z","fileName":"0-z6l6VDI6-photo.gif","fileType":"gif","inputTokens":1862,"outputTokens":389,"totalTokens":2251,"processingTime":3583,"extractedLength":1294}
+{"timestamp":"2026-03-05T08:32:49.306Z","fileName":"5f09ee88ed31286bd8b6e4a8_example-janitor-resume.png","fileType":"png","inputTokens":2636,"outputTokens":731,"totalTokens":3367,"processingTime":6671,"extractedLength":3257}
+{"timestamp":"2026-03-05T08:32:51.979Z","fileName":"Mock.png","fileType":"png","inputTokens":1346,"outputTokens":21,"totalTokens":1367,"processingTime":2159,"extractedLength":59}
+{"timestamp":"2026-03-05T08:32:54.970Z","fileName":"Mock.png","fileType":"png","inputTokens":1346,"outputTokens":25,"totalTokens":1371,"processingTime":1858,"extractedLength":60}
+{"timestamp":"2026-03-05T08:32:56.785Z","fileName":"0-z6l6VDI6-photo.gif","fileType":"gif","inputTokens":1862,"outputTokens":390,"totalTokens":2252,"processingTime":3679,"extractedLength":1300}
+{"timestamp":"2026-03-05T08:33:03.537Z","fileName":"5f09ee88ed31286bd8b6e4a8_example-janitor-resume.png","fileType":"png","inputTokens":2636,"outputTokens":731,"totalTokens":3367,"processingTime":6242,"extractedLength":3258}
+{"timestamp":"2026-03-05T08:33:06.405Z","fileName":"Helloการเขียนชื่อไทย.png","fileType":"png","inputTokens":1346,"outputTokens":33,"totalTokens":1379,"processingTime":1794,"extractedLength":92}
+{"timestamp":"2026-03-05T08:33:06.605Z","fileName":"cuteRibbonFont.jpg","fileType":"jpg","inputTokens":1346,"outputTokens":60,"totalTokens":1406,"processingTime":1988,"extractedLength":201}
+{"timestamp":"2026-03-05T08:33:06.609Z","fileName":"การพาณิชย์อิเล็กทรอนิกส์.png","fileType":"png","inputTokens":1088,"outputTokens":122,"totalTokens":1210,"processingTime":1995,"extractedLength":369}
+{"timestamp":"2026-03-05T08:33:08.972Z","fileName":"การพาณิชย์อิเล็กทรอนิกส์.png","fileType":"png","inputTokens":1088,"outputTokens":122,"totalTokens":1210,"processingTime":1843,"extractedLength":369}
+{"timestamp":"2026-03-05T08:33:08.975Z","fileName":"ไทยแลน.jpg","fileType":"jpg","inputTokens":1862,"outputTokens":10,"totalTokens":1872,"processingTime":1845,"extractedLength":22}
+{"timestamp":"2026-03-05T08:33:11.219Z","fileName":"ไทยแลน.jpg","fileType":"jpg","inputTokens":1862,"outputTokens":10,"totalTokens":1872,"processingTime":1727,"extractedLength":23}
+{"timestamp":"2026-03-05T08:33:11.461Z","fileName":"Mock.png","fileType":"png","inputTokens":1346,"outputTokens":21,"totalTokens":1367,"processingTime":1960,"extractedLength":59}
+{"timestamp":"2026-03-05T08:33:13.270Z","fileName":"0-z6l6VDI6-photo (1).gif","fileType":"gif","inputTokens":1862,"outputTokens":397,"totalTokens":2259,"processingTime":3773,"extractedLength":1327}
+{"timestamp":"2026-03-05T08:33:15.420Z","fileName":"Helloการเขียนชื่อไทย.png","fileType":"png","inputTokens":1346,"outputTokens":33,"totalTokens":1379,"processingTime":1633,"extractedLength":92}
+{"timestamp":"2026-03-05T08:33:15.553Z","fileName":"cuteRibbonFont.jpg","fileType":"jpg","inputTokens":1346,"outputTokens":60,"totalTokens":1406,"processingTime":1769,"extractedLength":201}
+{"timestamp":"2026-03-05T08:33:20.028Z","fileName":"5f09ee88ed31286bd8b6e4a8_example-janitor-resume (1).png","fileType":"png","inputTokens":2636,"outputTokens":760,"totalTokens":3396,"processingTime":6248,"extractedLength":3258}
+{"timestamp":"2026-03-05T08:33:22.279Z","fileName":"Helloการเขียนชื่อไทย.png","fileType":"png","inputTokens":1346,"outputTokens":33,"totalTokens":1379,"processingTime":1742,"extractedLength":92}
+{"timestamp":"2026-03-05T08:33:25.564Z","fileName":"2 (2).jpg","fileType":"jpg","inputTokens":1862,"outputTokens":531,"totalTokens":2393,"processingTime":5025,"extractedLength":1615}
+{"timestamp":"2026-03-05T08:33:27.093Z","fileName":"ทรรศนีย์ จันทร์สุวรรณ (1) (1) (2)_page-0001.jpg","fileType":"jpg","inputTokens":1862,"outputTokens":719,"totalTokens":2581,"processingTime":6550,"extractedLength":1667}
+{"timestamp":"2026-03-05T08:33:29.407Z","fileName":"Mock.png","fileType":"png","inputTokens":1346,"outputTokens":24,"totalTokens":1370,"processingTime":1789,"extractedLength":59}
+{"timestamp":"2026-03-05T08:33:29.645Z","fileName":"การพาณิชย์อิเล็กทรอนิกส์.png","fileType":"png","inputTokens":1088,"outputTokens":122,"totalTokens":1210,"processingTime":2030,"extractedLength":369}
+{"timestamp":"2026-03-05T08:33:31.210Z","fileName":"0-z6l6VDI6-photo (1).gif","fileType":"gif","inputTokens":1862,"outputTokens":391,"totalTokens":2253,"processingTime":3587,"extractedLength":1301}
+{"timestamp":"2026-03-05T08:33:33.751Z","fileName":"cuteRibbonFont.jpg","fileType":"jpg","inputTokens":1346,"outputTokens":60,"totalTokens":1406,"processingTime":2026,"extractedLength":201}
+{"timestamp":"2026-03-05T08:33:38.194Z","fileName":"5f09ee88ed31286bd8b6e4a8_example-janitor-resume (1).png","fileType":"png","inputTokens":2636,"outputTokens":733,"totalTokens":3369,"processingTime":6474,"extractedLength":3263}
+{"timestamp":"2026-03-05T08:33:42.294Z","fileName":"Mock.png","fileType":"png","inputTokens":1346,"outputTokens":22,"totalTokens":1368,"processingTime":1904,"extractedLength":60}
+{"timestamp":"2026-03-05T10:48:13.371Z","fileName":"Helloการเขียนชื่อไทย.png","fileType":"png","inputTokens":1346,"outputTokens":33,"totalTokens":1379,"processingTime":2143,"extractedLength":92}

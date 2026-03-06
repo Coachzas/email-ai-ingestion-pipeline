@@ -209,10 +209,20 @@ async function processAttachmentsInParallel(attachments, concurrency = 3, delayB
           errors++;
           console.log(`❌ OCR failed for ${attachmentResult.fileName} - ${attachmentResult.error}`);
         }
+        
+        // อัปเดต progress ทุกครั้งที่เสร็จแต่ละไฟล์
+        if (global.updateOcrProgress) {
+          global.updateOcrProgress(attachmentResult.fileName, processed, attachments.length);
+        }
       } else {
         errors++;
         console.log(`❌ OCR failed for ${chunk[index].fileName} - ${result.reason?.message || result.reason}`);
         results.push({ success: false, fileName: chunk[index].fileName, error: result.reason?.message || 'Unknown error' });
+        
+        // อัปเดต progress สำหรับ failed case
+        if (global.updateOcrProgress) {
+          global.updateOcrProgress(chunk[index].fileName, processed, attachments.length);
+        }
       }
     });
     

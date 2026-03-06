@@ -14,9 +14,6 @@ router.get('/', batchSchedulerController.getAllSchedulers);
 // GET /api/batch-schedulers/status - ตรวจสอบสถานะ batch ทั้งหมด
 router.get('/status', batchSchedulerController.getBatchStatus);
 
-// POST /api/batch-schedulers/test-imap - ทดสอบการเชื่อมต่อ IMAP
-router.post('/test-imap', batchSchedulerController.testImapConnection);
-
 // POST /api/batch-schedulers/:id/run-now - สั่งรัน scheduler ทันที
 router.post('/:id/run-now', batchSchedulerController.runSchedulerNow);
 

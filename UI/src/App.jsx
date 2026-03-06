@@ -14,6 +14,7 @@ import AccountManager from "./components/AccountManager.jsx";
 import TokenUsage from "./components/TokenUsage.jsx";
 import BatchSchedulerModal from "./components/BatchSchedulerModal.jsx";
 import BatchSchedulerList from "./components/BatchSchedulerList.jsx";
+import FileUpload from "./components/FileUpload.jsx";
 import { useBatchProgress } from "./hooks/useBatchProgress";
 
 // Lazy load components
@@ -55,20 +56,35 @@ export default function App() {
           : "/api/batch-schedulers";
         const method = isEdit ? "PUT" : "POST";
 
+        // Prepare request body based on schedule type
+        const requestBody = {
+          name: data.name,
+          batchSize: data.batchSize,
+          scheduleType: data.scheduleType,
+          startDate: data.startDate,
+          endDate: data.endDate || null,
+        };
+
+        // Add time fields based on schedule type
+        if (data.scheduleType === "daily") {
+          requestBody.customHour = data.customHour;
+          requestBody.customMinute = data.customMinute;
+        } else if (data.scheduleType === "custom") {
+          requestBody.customHour = data.customHour || 9;
+          requestBody.customMinute = data.customMinute || 0;
+          requestBody.selectedDays = data.selectedDays;
+          requestBody.dayTimeSlots = data.dayTimeSlots;
+        } else if (data.scheduleType === "hourly") {
+          requestBody.customHour = null;
+          requestBody.customMinute = null;
+        }
+
         const response = await fetch(url, {
           method,
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            name: data.name,
-            batchSize: data.batchSize,
-            scheduleType: data.scheduleType,
-            customHour: data.customHour,
-            customMinute: data.customMinute,
-            startDate: data.startDate,
-            endDate: data.endDate || null,
-          }),
+          body: JSON.stringify(requestBody),
         });
 
         const result = await response.json();
@@ -254,6 +270,21 @@ export default function App() {
                 }}
               >
                 📊 Token Usage
+              </button>
+              <button
+                onClick={() => setCurrentView("upload")}
+                style={{
+                  padding: "8px 16px",
+                  backgroundColor:
+                    currentView === "upload" ? "#007bff" : "#333",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "4px",
+                  marginRight: "10px",
+                  cursor: "pointer",
+                }}
+              >
+                📁 File Upload
               </button>
             </nav>
 
@@ -446,6 +477,8 @@ export default function App() {
               {currentView === "accounts" && <AccountManager />}
 
               {currentView === "tokens" && <TokenUsage />}
+
+              {currentView === "upload" && <FileUpload />}
 
               {reviewEmailId && (
                 <ReviewEmailModal
