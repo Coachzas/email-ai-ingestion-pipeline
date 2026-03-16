@@ -30,6 +30,7 @@ class GeminiExtractor {
    * @returns {Promise<string>} - ข้อความที่ดึงได้
    */
   async extractTextFromPath(filePath, options = {}) {
+    const { originalFileName } = options;
     try {
       console.log(`🔍 Gemini: Starting text extraction from ${filePath}`);
       
@@ -87,8 +88,8 @@ class GeminiExtractor {
         console.log(`   - Total tokens: ${usage.totalTokenCount || 'N/A'}`);
         
         // Log to file for history tracking
-        const fileName = path.basename(filePath);
-        const fileType = path.extname(filePath).toLowerCase().substring(1) || 'unknown';
+        const fileName = originalFileName || path.basename(filePath);
+        const fileType = path.extname(originalFileName || filePath).toLowerCase().substring(1) || 'unknown';
         
         tokenUsageLogger.logUsage({
           fileName,
@@ -122,6 +123,7 @@ class GeminiExtractor {
    * @returns {Promise<string>} - ข้อความที่ดึงได้
    */
   async extractTextFromBuffer(buffer, mimeType, options = {}) {
+    const { originalFileName } = options;
     try {
       if (!Buffer.isBuffer(buffer)) {
         throw new Error('Input must be a Buffer');

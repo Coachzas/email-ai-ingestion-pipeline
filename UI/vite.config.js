@@ -5,6 +5,8 @@ import autoprefixer from 'autoprefixer'
 // Proxy `/api` requests from Vite dev server to backend running on localhost:4000
 export default defineConfig({
   server: {
+    host: '0.0.0.0', // Allow external access
+    port: 5173,
     proxy: {
       '/api': {
         target: 'http://localhost:4000',

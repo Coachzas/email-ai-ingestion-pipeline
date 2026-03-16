@@ -10,12 +10,17 @@ const fs = require('fs');
  * หมายเหตุ: ไม่บันทึกฐานข้อมูลที่นี่ - ให้ attachment-ocr.service.js จัดการ
  * เพื่อป้องกันการบันทึกซ้ำซ้อนและ race condition
  */
-module.exports = async (filePath, attachmentId = null) => {
+module.exports = async (filePath, attachment = null) => {
   try {
     if (!fs.existsSync(filePath)) return '';
 
     // Extract text using Gemini OCR service
-    const result = await extractTextFromPath(filePath, { attachmentId });
+    const options = attachment ? { 
+      attachmentId: attachment.id,
+      originalFileName: attachment.originalFileName 
+    } : { attachmentId: null };
+    
+    const result = await extractTextFromPath(filePath, options);
     
     // ไม่บันทึกฐานข้อมูลที่นี่
     // ให้ attachment-ocr.service.js จัดการการบันทึกที่จุดเดียว

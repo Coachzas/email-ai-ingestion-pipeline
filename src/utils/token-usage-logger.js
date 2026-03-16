@@ -129,9 +129,9 @@ class TokenUsageLogger {
     stats.totalTokens = stats.totalInputTokens + stats.totalOutputTokens;
     stats.averageTokensPerRequest = Math.round(stats.totalTokens / stats.totalRequests);
     
-    // คำนวณค่าใช้จ่าย (Gemini 2.0 Flash pricing: $0.075/1M input tokens, $0.30/1M output tokens)
-    const inputCostPerMillion = 0.075;
-    const outputCostPerMillion = 0.30;
+    // คำนวณค่าใช้จ่าย (Gemini 2.0 Flash pricing: $0.025/1M input tokens, $0.15/1M output tokens)
+    const inputCostPerMillion = 0.025;
+    const outputCostPerMillion = 0.15;
     const exchangeRate = 32; // 32 THB per USD
     
     const costUSD = (stats.totalInputTokens / 1000000) * inputCostPerMillion + 
@@ -182,44 +182,8 @@ class TokenUsageLogger {
       fs.writeFileSync(this.logFile, filteredLines.join('\n') + '\n');
       console.log(`🧹 Cleaned up token usage logs (kept last ${days} days)`);
     } catch (error) {
-      console.warn('⚠️ Failed to cleanup old logs:', error.message);
+      console.error('⚠️ Failed to cleanup old logs:', error.message);
     }
-  }
-
-  /**
-   * สร้างรายงานการใช้ Token ในรูปแบบข้อความ
-   * @param {string} period - ระยะเวลา
-   * @returns {string} - รายงานในรูปแบบข้อความ
-   */
-  generateReport(period = 'today') {
-    const stats = this.getUsageStats(period);
-    const recentLogs = this.getUsageHistory(10);
-
-    let report = `\n📊 Gemini Token Usage Report - ${period.toUpperCase()}\n`;
-    report += `${'='.repeat(50)}\n\n`;
-    
-    report += `📈 Summary:\n`;
-    report += `   • Total Requests: ${stats.totalRequests}\n`;
-    report += `   • Total Input Tokens: ${stats.totalInputTokens.toLocaleString()}\n`;
-    report += `   • Total Output Tokens: ${stats.totalOutputTokens.toLocaleString()}\n`;
-    report += `   • Total Tokens: ${stats.totalTokens.toLocaleString()}\n`;
-    report += `   • Average per Request: ${stats.averageTokensPerRequest.toLocaleString()}\n\n`;
-
-    if (stats.byFileType && Object.keys(stats.byFileType).length > 0) {
-      report += `📁 By File Type:\n`;
-      Object.entries(stats.byFileType).forEach(([type, data]) => {
-        report += `   • ${type}: ${data.count} files, ${data.tokens.toLocaleString()} tokens\n`;
-      });
-      report += '\n';
-    }
-
-    report += `🕒 Recent Activity (last 10):\n`;
-    recentLogs.forEach((log, index) => {
-      const time = new Date(log.timestamp).toLocaleString('th-TH');
-      report += `   ${index + 1}. ${time} - ${log.fileName} (${log.totalTokens || 0} tokens)\n`;
-    });
-
-    return report;
   }
 }
 

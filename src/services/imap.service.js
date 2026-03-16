@@ -223,22 +223,32 @@ async function fetchEmails(startDate, endDate, accountConfig = null, options = {
 
         // มี attachments?
         if (parsed.attachments?.length) {
-          const dir = path.join(__dirname, "../../storage", email.id);
-          fs.mkdirSync(dir, { recursive: true });
-
+          const storageService = require('./storage.service');
+          
           for (const file of parsed.attachments) {
             try {
-              const filePath = path.join(dir, file.filename);
-              fs.writeFileSync(filePath, file.content); // บันทึกไฟล์จริงลงใน Disk
-
+              // อัปโหลดไฟล์ไป Supabase Storage
+              const uploadResult = await storageService.uploadAttachment(
+                null, // ไม่มี local path
+                file.filename,
+                accountConfig?.userId || '00000000-0000-0000-0000-000000000001', // ใช้ userId ของ account หรือ admin
+                email.id,
+                file.content, // ส่ง buffer ของไฟล์
+                file.contentType // ส่ง MIME type ด้วย
+              );
+              
+              // สร้าง attachment record ใน database
               await prisma.attachment.create({
-                // สร้างประวัติไฟล์แนบในฐานข้อมูล
                 data: {
                   emailId: email.id,
-                  fileName: file.filename,
+                  fileName: file.filename, // Original Thai filename
+                  originalFileName: file.filename, // เก็บชื่อไฟล์ต้นฉบับภาษาไทย
                   fileType: file.contentType,
-                  filePath,
-                  size: file.content.length, // เพิ่มขนาดไฟล์
+                  filePath: uploadResult.path, // UUID-based path
+                  cloudPath: uploadResult.path, // UUID-based path
+                  cloudProvider: 'supabase',
+                  size: file.content.length,
+                  userId: email.userId || accountConfig?.userId // ใช้ userId จาก email ก่อน
                 },
               });
             } catch (fileErr) {

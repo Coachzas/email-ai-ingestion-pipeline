@@ -9,6 +9,7 @@ const tokenUsageRoutes = require('./routes/token-usage.routes');
 const batchSchedulerRoutes = require('./routes/batchScheduler.routes');
 const batchRunsRoutes = require('./routes/batch-runs.routes');
 const fileUploadRoutes = require('./routes/file-upload.routes');
+const authRoutes = require('./routes/auth.routes');
 // Note: Removed legacy email.routes - not used in current system
 // Note: Removed ingest.routes - manual ingest system removed
 
@@ -16,8 +17,6 @@ const path = require('path');
 
 // serve UI
 app.use(express.static(path.join(__dirname, '../UI')));
-// serve uploaded files
-app.use('/storage', express.static(path.join(__dirname, '../storage')));
 
 // middleware
 app.use(cors());
@@ -37,6 +36,8 @@ app.use('/api/batch-schedulers', batchSchedulerRoutes);
 app.use('/api/batch-runs', batchRunsRoutes);
 // File Upload routes
 app.use('/api/file-upload', fileUploadRoutes);
+// Authentication routes
+app.use('/api/auth', authRoutes);
 
 // default page
 app.get('/', (req, res) => {

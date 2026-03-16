@@ -25,6 +25,9 @@ const updateAttachmentStatus = async (attachmentId, status) => {
 */
 
 const pdfExtractor = async (filePath, attachmentId = null) => {
+  const startTime = Date.now();
+  const path = require('path');
+  
   // Remove status update to avoid conflicts
   // if (attachmentId) await updateAttachmentStatus(attachmentId, 'PROCESSING');
 
@@ -32,6 +35,7 @@ const pdfExtractor = async (filePath, attachmentId = null) => {
     if (!fs.existsSync(filePath)) return '';
 
     const dataBuffer = fs.readFileSync(filePath);
+    const fileName = path.basename(filePath);
 
     // --- Method 1: Digital Text ---
     try {
@@ -42,6 +46,7 @@ const pdfExtractor = async (filePath, attachmentId = null) => {
           .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
         
         if (cleanText.length > 150) {
+          // PDF parse doesn't use API tokens - don't log to token usage
           // Remove status update to avoid conflicts
           // if (attachmentId) await updateAttachmentStatus(attachmentId, 'COMPLETED');
           return cleanText;

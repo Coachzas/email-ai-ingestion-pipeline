@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 const FileUpload = () => {
+  const { token } = useAuth();
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -15,7 +17,11 @@ const FileUpload = () => {
   const fetchFiles = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/file-upload/files');
+      const response = await fetch('/api/file-upload/', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       const result = await response.json();
       
       if (result.success) {
@@ -50,6 +56,9 @@ const FileUpload = () => {
       setUploading(true);
       const response = await fetch('/api/file-upload/upload', {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
         body: formData,
       });
 
@@ -71,14 +80,17 @@ const FileUpload = () => {
     }
   };
 
-  const handleDelete = async (fileName) => {
-    if (!confirm(`ต้องการลบไฟล์ "${fileName}" หรือไม่?`)) {
+  const handleDelete = async (file) => {
+    if (!confirm(`ต้องการลบไฟล์ "${file.fileName}" หรือไม่?`)) {
       return;
     }
 
     try {
-      const response = await fetch(`/api/file-upload/files/${encodeURIComponent(fileName)}`, {
+      const response = await fetch(`/api/file-upload/${file.id}`, {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
 
       const result = await response.json();
@@ -95,24 +107,25 @@ const FileUpload = () => {
     }
   };
 
-  const handleRename = async (oldFileName) => {
-    const newFileName = prompt(`เปลี่ยนชื่อใหม่สำหรับไฟล์ "${oldFileName}":`, oldFileName);
+  const handleRename = async (file) => {
+    const newFileName = prompt(`เปลี่ยนชื่อใหม่สำหรับไฟล์ "${file.fileName}":`, file.fileName);
     
     if (!newFileName || newFileName.trim() === '') {
       return;
     }
 
     // ตรวจสอบนามสกุลไฟล์
-    const fileExtension = oldFileName.split('.').pop();
+    const fileExtension = file.fileName.split('.').pop();
     const finalFileName = newFileName.endsWith(`.${fileExtension}`) 
       ? newFileName 
       : `${newFileName}.${fileExtension}`;
 
     try {
-      const response = await fetch(`/api/file-upload/files/${encodeURIComponent(oldFileName)}/rename`, {
+      const response = await fetch(`/api/file-upload/${file.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ newFileName: finalFileName }),
       });
@@ -131,10 +144,14 @@ const FileUpload = () => {
     }
   };
 
-  const handleViewData = async (fileName) => {
+  const handleViewData = async (file) => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/file-upload/files/${encodeURIComponent(fileName)}/read`);
+      const response = await fetch(`/api/file-upload/${file.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       const result = await response.json();
 
       if (result.success) {
@@ -249,7 +266,7 @@ const FileUpload = () => {
                   <tr key={index} style={{ borderBottom: '1px solid #222' }}>
                     <td style={{ padding: '10px' }}>
                       <span 
-                        onClick={() => handleRename(file.fileName)}
+                        onClick={() => handleRename(file)}
                         style={{
                           color: '#4dabf7',
                           cursor: 'pointer',
@@ -269,7 +286,7 @@ const FileUpload = () => {
                     </td>
                     <td style={{ padding: '10px', textAlign: 'center' }}>
                       <button
-                        onClick={() => handleViewData(file.fileName)}
+                        onClick={() => handleViewData(file)}
                         style={{
                           padding: '4px 8px',
                           backgroundColor: '#007bff',
@@ -284,7 +301,7 @@ const FileUpload = () => {
                         ดูข้อมูล
                       </button>
                       <button
-                        onClick={() => handleDelete(file.fileName)}
+                        onClick={() => handleDelete(file)}
                         style={{
                           padding: '4px 8px',
                           backgroundColor: '#dc3545',

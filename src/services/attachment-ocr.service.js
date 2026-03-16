@@ -1,6 +1,79 @@
 const extractors = require('./extractors');
 const GeminiOcrService = require('./gemini-ocr.service');
 const prisma = require('../utils/prisma');
+const { supabase } = require('../utils/supabase');
+const fs = require('fs');
+const path = require('path');
+
+/**
+ * ดาวน์โหลดไฟล์จาก Supabase Storage และทำ OCR พร้อม retry mechanism
+ */
+const downloadFromSupabase = async (attachment, maxRetries = 3) => {
+  let lastError;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      if (!attachment.cloudPath || attachment.cloudProvider !== 'supabase') {
+        // ถ้าไม่มีใน Supabase ใช้ local path
+        return attachment.filePath;
+      }
+
+      // สร้าง temp path สำหรับ download
+      const tempDir = path.join(__dirname, '../../temp');
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+
+      const tempFilePath = path.join(tempDir, `temp_${attachment.id}_${Date.now()}${path.extname(attachment.fileName || '.bin')}`);
+      
+      console.log(`🔄 Download attempt ${attempt}/${maxRetries} for ${attachment.fileName}`);
+      
+      // ดาวน์โหลดจาก Supabase
+      const { data, error } = await supabase.storage
+        .from('attachments')
+        .download(attachment.cloudPath);
+
+      if (error) {
+        console.error(`Download attempt ${attempt} error:`, error);
+        throw error;
+      }
+
+      // แปลง Blob เป็น Buffer แล้วเขียนไฟล์ลง temp
+      let buffer;
+      if (data instanceof Blob) {
+        buffer = Buffer.from(await data.arrayBuffer());
+      } else {
+        buffer = data; // ถ้าเป็น Buffer อยู่แล้ว
+      }
+      
+      console.log(`📥 Downloaded ${buffer.length} bytes for ${attachment.fileName}`);
+      fs.writeFileSync(tempFilePath, buffer);
+      
+      // ตรวจสอบว่าไฟล์ถูกสร้างแล้ว
+      if (!fs.existsSync(tempFilePath)) {
+        throw new Error(`Failed to create temp file: ${tempFilePath}`);
+      }
+      
+      console.log(`✅ Downloaded from Supabase: ${attachment.cloudPath} → ${tempFilePath}`);
+      return tempFilePath;
+
+    } catch (error) {
+      lastError = error;
+      console.error(`❌ Download attempt ${attempt} failed:`, error.message);
+      
+      // ถ้ายังไม่ใช่ครั้งสุดท้าย ให้รอก่อน retry
+      if (attempt < maxRetries) {
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // Exponential backoff: 1s, 2s, 4s
+        console.log(`⏱️ Waiting ${delay}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  // ถ้า retry ครบแล้วยังไม่สำเร็จ
+  console.error(`❌ All download attempts failed for ${attachment.fileName}`);
+  throw lastError;
+};
 
 /**
  * ทำความสะอาดข้อความสำหรับ database
@@ -21,10 +94,7 @@ function sanitizeText(text) {
  * PURE FUNCTION: ดึงข้อความจากไฟล์โดยไม่มี side effects
  * รับแค่ filePath และคืนข้อความเท่านั้น
  */
-async function extractTextFromPath(filePath, attachmentId = null) {
-  const fs = require('fs');
-  const path = require('path');
-  if (!fs.existsSync(filePath)) return '';
+async function extractTextFromPath(filePath, attachment = null) {
   const ext = path.extname(filePath).toLowerCase();
   switch (ext) {
     case '.jpg':
@@ -36,7 +106,7 @@ async function extractTextFromPath(filePath, attachmentId = null) {
     case '.gif':
       try {
         // ใช้ image extractor ที่มีการบันทึกข้อมูลแล้ว
-        const imageResult = await extractors.image(filePath, attachmentId);
+        const imageResult = await extractors.image(filePath, attachment);
         const sanitizedResult = sanitizeText(imageResult || '');
         
         // Log ผลลัพธ์สำหรับ debugging
@@ -111,14 +181,9 @@ async function processAttachment(attachment, index, total) {
   const fs = require('fs');
   
   try {
-    if (!fs.existsSync(attachment.filePath)) {
-      console.log(`❌ File not found: ${attachment.filePath} - Marking as FAILED`);
-      await prisma.attachment.update({
-        where: { id: attachment.id },
-        data: { ocrStatus: 'FAILED' }
-      });
-      return { success: false, fileName: attachment.fileName, error: 'File not found' };
-    }
+    // ดาวน์โหลดไฟล์จาก Supabase หรือ local พร้อม retry
+    const filePath = await downloadFromSupabase(attachment);
+    console.log(`📁 Processing file: ${filePath} (${attachment.fileName})`);
 
     // อัปเดตสถานะเป็นกำลังประมวลผล
     await prisma.attachment.update({
@@ -126,7 +191,18 @@ async function processAttachment(attachment, index, total) {
       data: { ocrStatus: 'PROCESSING' }
     });
 
-    const extractedText = await extractTextFromPath(attachment.filePath, attachment.id);
+    // ตรวจสอบว่าไฟล์มีอยู่จริงก่อน extract
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`Temp file not found: ${filePath}`);
+    }
+
+    const extractedText = await extractTextFromPath(filePath, attachment);
+    console.log(`📝 Extracted text length: ${extractedText ? extractedText.length : 0}`);
+    
+    // ลบ temp file
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
     
     // ตรวจสอบผลลัพธ์ก่อนบันทึก
     if (extractedText === null) {
@@ -160,15 +236,25 @@ async function processAttachment(attachment, index, total) {
     return { success: true, fileName: attachment.fileName, textLength: extractedText.length };
   } catch (error) {
     console.error(`❌ Error processing ${attachment.fileName}:`, error.message);
+    
+    // ตรวจสอบว่าเป็น network error หรือไม่
+    const isNetworkError = error.message?.includes('ECONNRESET') || 
+                         error.message?.includes('502') ||
+                         error.message?.includes('Bad Gateway') ||
+                         error.message?.includes('timeout') ||
+                         error.originalError?.status === 502;
+    
     try {
       await prisma.attachment.update({
         where: { id: attachment.id },
-        data: { ocrStatus: 'FAILED' }
+        data: { 
+          ocrStatus: isNetworkError ? 'PENDING' : 'FAILED' // ถ้าเป็น network error ให้ลองใหม่ภายหลัง
+        }
       });
     } catch (updateErr) {
       console.error(`❌ Failed to update status for ${attachment.fileName}:`, updateErr.message);
     }
-    return { success: false, fileName: attachment.fileName, error: error.message };
+    return { success: false, fileName: attachment.fileName, error: error.message, isRetryable: isNetworkError };
   }
 }
 
@@ -184,7 +270,7 @@ async function processAttachmentsInParallel(attachments, concurrency = 3, delayB
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i];
     console.log(`📦 Processing batch ${i + 1}/${chunks.length} (${chunk.length} files)`);
-    
+
     // ประมวลผล parallel ใน batch
     const chunkPromises = chunk.map((attachment, chunkIndex) => 
       processAttachment(attachment, processed + chunkIndex, attachments.length)
@@ -206,8 +292,13 @@ async function processAttachmentsInParallel(attachments, concurrency = 3, delayB
             console.log(`✅ OCR completed for ${attachmentResult.fileName} - ${attachmentResult.textLength} chars`);
           }
         } else {
-          errors++;
-          console.log(`❌ OCR failed for ${attachmentResult.fileName} - ${attachmentResult.error}`);
+          if (attachmentResult.isRetryable) {
+            console.log(`🔄 OCR retryable for ${attachmentResult.fileName} - ${attachmentResult.error}`);
+            // ไม่นับเป็น error เพราะสามารถ retry ได้
+          } else {
+            errors++;
+            console.log(`❌ OCR failed for ${attachmentResult.fileName} - ${attachmentResult.error}`);
+          }
         }
         
         // อัปเดต progress ทุกครั้งที่เสร็จแต่ละไฟล์

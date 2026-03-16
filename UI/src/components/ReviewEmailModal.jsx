@@ -15,29 +15,30 @@ const formatDate = (dateString) => {
   }
 }
 
-export default function ReviewEmailModal({ emailId, onClose }) {
+export default function ReviewEmailModal({ email, onClose }) {
+  console.log('ReviewEmailModal rendered with email:', email);
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [email, setEmail] = useState(null)
+  const [emailDetail, setEmailDetail] = useState(null)
 
   useEffect(() => {
-    if (!emailId) return
+    if (!email) return
 
     let isMounted = true
 
     const run = async () => {
       setIsLoading(true)
       setError(null)
-      setEmail(null)
+      setEmailDetail(null)
 
       try {
-        const response = await fetch(`/api/review/emails/${emailId}`)
+        const response = await fetch(`/api/review/emails/${email.id}`)
         if (!response.ok) throw new Error('Failed to fetch email detail')
 
         const data = await response.json()
         if (!isMounted) return
 
-        setEmail(data.email)
+        setEmailDetail(data.email)
       } catch (err) {
         if (!isMounted) return
         setError(err)
@@ -52,7 +53,7 @@ export default function ReviewEmailModal({ emailId, onClose }) {
     return () => {
       isMounted = false
     }
-  }, [emailId])
+  }, [email?.id])
 
 
   return (
@@ -74,48 +75,54 @@ export default function ReviewEmailModal({ emailId, onClose }) {
 
           {error && <div className="error-message">❌ {error.message}</div>}
 
-          {!isLoading && !error && email && (
+          {!isLoading && !error && emailDetail && (
             <div className="review-detail-grid">
               <div className="review-panel">
                 <h4>📧 อีเมล</h4>
                 <div className="review-kv">
                   <div>
                     <strong>From</strong>
-                    <div className="review-kv-value">{email.fromEmail}</div>
+                    <div className="review-kv-value">{emailDetail.fromEmail}</div>
                   </div>
                   <div>
                     <strong>Subject</strong>
-                    <div className="review-kv-value">{email.subject || '(no subject)'}</div>
+                    <div className="review-kv-value">{emailDetail.subject || '(no subject)'}</div>
                   </div>
                   <div>
                     <strong>Received</strong>
-                    <div className="review-kv-value">{formatDate(email.receivedAt)}</div>
+                    <div className="review-kv-value">{formatDate(emailDetail.receivedAt)}</div>
                   </div>
                   <div>
                     <strong>UID</strong>
-                    <div className="review-kv-value">{email.imapUid}</div>
+                    <div className="review-kv-value">{emailDetail.imapUid}</div>
                   </div>
                 </div>
 
                 <div className="review-text-block">
                   <strong>Body</strong>
-                  <pre className="review-pre">{email.bodyText || ''}</pre>
+                  <pre className="review-pre">{emailDetail.bodyText || ''}</pre>
                 </div>
               </div>
 
               <div className="review-panel">
                 <h4>📎 ไฟล์แนบ</h4>
 
-                {(!email.attachments || email.attachments.length === 0) && (
+                {(!emailDetail.attachments || emailDetail.attachments.length === 0) && (
                   <div className="review-empty">ไม่มีไฟล์แนบ</div>
                 )}
 
-                {email.attachments && email.attachments.length > 0 && (
+                {console.log('Email attachments:', emailDetail.attachments)}
+                {emailDetail.attachments && emailDetail.attachments.length > 0 && (
                   <div className="attachment-list">
-                    {email.attachments.map((att) => (
+                    {emailDetail.attachments.map((att) => (
                       <div key={att.id} className="attachment-item">
                         <div className="attachment-top">
-                          <div className="attachment-name">{att.fileName}</div>
+                          <div className="attachment-name">
+                            {(() => {
+                              console.log('Attachment:', { id: att.id, fileName: att.fileName, originalFileName: att.originalFileName });
+                              return att.originalFileName || att.fileName;
+                            })()}
+                          </div>
                           <div className="attachment-actions">
                             <a
                               className="attachment-download"

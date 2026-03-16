@@ -1,6 +1,5 @@
-const GeminiExtractor = require('./extractors/gemini.extractor');
-const path = require('path');
 const fs = require('fs');
+const path = require('path');
 
 /**
  * Gemini OCR Service
@@ -8,7 +7,17 @@ const fs = require('fs');
  */
 class GeminiOcrService {
   constructor() {
-    this.extractor = new GeminiExtractor();
+    this.extractor = null;
+  }
+
+  async init() {
+    try {
+      // ใช้ require แทน dynamic import สำหรับ CommonJS module
+      const GeminiExtractor = require('./extractors/gemini.extractor.js');
+      this.extractor = new GeminiExtractor();
+    } catch (error) {
+      console.error('Failed to load Gemini extractor:', error);
+    }
   }
 
   /**
@@ -20,6 +29,16 @@ class GeminiOcrService {
   async extractTextFromPath(filePath, options = {}) {
     try {
       console.log(`🔍 Gemini Service: Processing file: ${filePath}`);
+      
+      // ตรวจสอบว่า extractor พร้อมใช้งานหรือไม่
+      if (!this.extractor) {
+        await this.init();
+      }
+      
+      if (!this.extractor) {
+        throw new Error('Gemini extractor not available');
+      }
+      
       const result = await this.extractor.extractTextFromPath(filePath, options);
       console.log(`✅ Gemini Service: Extraction completed (${result.length} characters)`);
       return result;
@@ -39,6 +58,16 @@ class GeminiOcrService {
   async extractTextFromBuffer(buffer, mimeType, options = {}) {
     try {
       console.log(`🔍 Gemini Service: Processing buffer (${buffer.length} bytes, ${mimeType})`);
+      
+      // ตรวจสอบว่า extractor พร้อมใช้งานหรือไม่
+      if (!this.extractor) {
+        await this.init();
+      }
+      
+      if (!this.extractor) {
+        throw new Error('Gemini extractor not available');
+      }
+      
       const result = await this.extractor.extractTextFromBuffer(buffer, mimeType, options);
       console.log(`✅ Gemini Service: Buffer extraction completed (${result.length} characters)`);
       return result;
@@ -55,6 +84,17 @@ class GeminiOcrService {
   async testConnection() {
     try {
       console.log('🔍 Gemini Service: Testing API connection...');
+      
+      // ตรวจสอบว่า extractor พร้อมใช้งานหรือไม่
+      if (!this.extractor) {
+        await this.init();
+      }
+      
+      if (!this.extractor) {
+        console.error('❌ Gemini Service: Extractor not available for connection test');
+        return false;
+      }
+      
       const result = await this.extractor.testConnection();
       console.log(`✅ Gemini Service: Connection test result: ${result}`);
       return result;
@@ -115,6 +155,11 @@ class GeminiOcrService {
 
 // Export singleton instance
 const geminiOcrService = new GeminiOcrService();
+
+// Initialize the service
+geminiOcrService.init().catch(error => {
+  console.error('Failed to initialize Gemini OCR Service:', error);
+});
 
 module.exports = {
   extractTextFromPath: geminiOcrService.extractTextFromPath.bind(geminiOcrService),

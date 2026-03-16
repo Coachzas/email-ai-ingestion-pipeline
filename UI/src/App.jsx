@@ -15,15 +15,16 @@ import TokenUsage from "./components/TokenUsage.jsx";
 import BatchSchedulerModal from "./components/BatchSchedulerModal.jsx";
 import BatchSchedulerList from "./components/BatchSchedulerList.jsx";
 import FileUpload from "./components/FileUpload.jsx";
+import Login from "./components/Login.jsx";
+import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
 import { useBatchProgress } from "./hooks/useBatchProgress";
 
 // Lazy load components
 
-export default function App() {
-  console.log("App component rendering...");
-
+function AuthenticatedApp() {
+  const { user, logout, isAuthenticated, loading } = useAuth();
   const [reviewEmailId, setReviewEmailId] = useState(null);
-  const [currentView, setCurrentView] = useState("pipeline"); // 'pipeline', 'accounts', or 'tokens'
+  const [currentView, setCurrentView] = useState("pipeline"); // 'pipeline', 'accounts', 'tokens', or 'upload'
   const [reviewQueueItems, setReviewQueueItems] = useState([]);
   const [showBatchScheduler, setShowBatchScheduler] = useState(false);
   const [showBatchSchedulerList, setShowBatchSchedulerList] = useState(false);
@@ -33,16 +34,125 @@ export default function App() {
   const [nextBatchRunAt, setNextBatchRunAt] = useState(null);
   const [nextBatchName, setNextBatchName] = useState(null);
 
-  try {
-    const {
-      isProcessing,
-      currentItem,
-      processedEmails,
-      skippedEmails,
-      getOverallProgress,
-      getPhaseText,
-    } = useBatchProgress();
+  // Move useBatchProgress hook to the top before any conditional returns
+  const {
+    isProcessing,
+    currentItem,
+    processedEmails,
+    skippedEmails,
+    getOverallProgress,
+    getPhaseText,
+  } = useBatchProgress();
 
+  // Move all other hooks to the top
+  const handleReviewQueueItems = useCallback((items) => {
+    setReviewQueueItems(items);
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const pickNearestNextRun = (statusData) => {
+      const schedulers = statusData?.activeSchedulers || [];
+      const candidates = schedulers
+        .map((s) => ({
+          name: s?.name || null,
+          nextRunAt: s?.nextRunAt ? new Date(s.nextRunAt) : null,
+        }))
+        .filter((x) => x.nextRunAt && !Number.isNaN(x.nextRunAt.getTime()));
+
+      if (!candidates.length) return { nextRunAt: null, name: null };
+
+      candidates.sort(
+        (a, b) => a.nextRunAt.getTime() - b.nextRunAt.getTime(),
+      );
+      return { nextRunAt: candidates[0].nextRunAt, name: candidates[0].name };
+    };
+
+    const fetchStatus = async () => {
+      try {
+        const response = await fetch("/api/batch-schedulers/status");
+        const result = await response.json();
+        if (!isMounted) return;
+
+        if (result?.success) {
+          const picked = pickNearestNextRun(result.data);
+          setNextBatchRunAt(picked.nextRunAt);
+          setNextBatchName(picked.name);
+        }
+      } catch (e) {}
+    };
+
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 30000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const formatThaiTime = useCallback((date) => {
+    try {
+      return new Intl.DateTimeFormat("th-TH", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      }).format(date);
+    } catch {
+      return date.toLocaleString("th-TH");
+    }
+  }, []);
+
+  const nextBatchCountdown = useMemo(() => {
+    if (!nextBatchRunAt) return null;
+    const diffMs = nextBatchRunAt.getTime() - now.getTime();
+    if (diffMs <= 0) return "กำลังเริ่มทำงาน...";
+
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    const parts = [];
+    if (days) parts.push(`${days} วัน`);
+    if (hours || days) parts.push(`${String(hours).padStart(2, "0")} ชม.`);
+    parts.push(`${String(minutes).padStart(2, "0")} นาที`);
+    parts.push(`${String(seconds).padStart(2, "0")} วิ`);
+    return parts.join(" ");
+  }, [nextBatchRunAt, now]);
+
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100vh',
+        backgroundColor: '#1a1a1a',
+        color: '#fff'
+      }}>
+        กำลังโหลด...
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Login />;
+  }
+
+  try {
     const handleEditScheduler = (scheduler) => {
       setEditScheduler(scheduler);
       setShowBatchScheduler(true);
@@ -115,95 +225,7 @@ export default function App() {
       }
     };
 
-    const handleReviewQueueItems = useCallback((items) => {
-      setReviewQueueItems(items);
-    }, []);
-
-    useEffect(() => {
-      const timer = setInterval(() => {
-        setNow(new Date());
-      }, 1000);
-      return () => clearInterval(timer);
-    }, []);
-
-    useEffect(() => {
-      let isMounted = true;
-
-      const pickNearestNextRun = (statusData) => {
-        const schedulers = statusData?.activeSchedulers || [];
-        const candidates = schedulers
-          .map((s) => ({
-            name: s?.name || null,
-            nextRunAt: s?.nextRunAt ? new Date(s.nextRunAt) : null,
-          }))
-          .filter((x) => x.nextRunAt && !Number.isNaN(x.nextRunAt.getTime()));
-
-        if (!candidates.length) return { nextRunAt: null, name: null };
-
-        candidates.sort(
-          (a, b) => a.nextRunAt.getTime() - b.nextRunAt.getTime(),
-        );
-        return { nextRunAt: candidates[0].nextRunAt, name: candidates[0].name };
-      };
-
-      const fetchStatus = async () => {
-        try {
-          const response = await fetch("/api/batch-schedulers/status");
-          const result = await response.json();
-          if (!isMounted) return;
-
-          if (result?.success) {
-            const picked = pickNearestNextRun(result.data);
-            setNextBatchRunAt(picked.nextRunAt);
-            setNextBatchName(picked.name);
-          }
-        } catch (e) {}
-      };
-
-      fetchStatus();
-      const interval = setInterval(fetchStatus, 30000);
-      return () => {
-        isMounted = false;
-        clearInterval(interval);
-      };
-    }, []);
-
-    const formatThaiTime = useCallback((date) => {
-      try {
-        return new Intl.DateTimeFormat("th-TH", {
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          hour12: false,
-        }).format(date);
-      } catch {
-        return date.toLocaleString("th-TH");
-      }
-    }, []);
-
-    const nextBatchCountdown = useMemo(() => {
-      if (!nextBatchRunAt) return null;
-      const diffMs = nextBatchRunAt.getTime() - now.getTime();
-      if (diffMs <= 0) return "กำลังเริ่มทำงาน...";
-
-      const totalSeconds = Math.floor(diffMs / 1000);
-      const days = Math.floor(totalSeconds / 86400);
-      const hours = Math.floor((totalSeconds % 86400) / 3600);
-      const minutes = Math.floor((totalSeconds % 3600) / 60);
-      const seconds = totalSeconds % 60;
-
-      const parts = [];
-      if (days) parts.push(`${days} วัน`);
-      if (hours || days) parts.push(`${String(hours).padStart(2, "0")} ชม.`);
-      parts.push(`${String(minutes).padStart(2, "0")} นาที`);
-      parts.push(`${String(seconds).padStart(2, "0")} วิ`);
-      return parts.join(" ");
-    }, [nextBatchRunAt, now]);
-
-    const openReviewEmail = (id) => {
+     const openReviewEmail = (id) => {
       setReviewEmailId(id);
     };
 
@@ -286,6 +308,24 @@ export default function App() {
               >
                 📁 File Upload
               </button>
+              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ color: '#bbb', fontSize: '14px' }}>
+                  สวัสดี, {user?.name || user?.email}
+                </span>
+                <button
+                  onClick={logout}
+                  style={{
+                    padding: "8px 16px",
+                    backgroundColor: "#dc3545",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                  }}
+                >
+                  ออกจากระบบ
+                </button>
+              </div>
             </nav>
 
             <div style={{ padding: "0 20px" }}>
@@ -482,7 +522,7 @@ export default function App() {
 
               {reviewEmailId && (
                 <ReviewEmailModal
-                  emailId={reviewEmailId}
+                  email={{id: reviewEmailId}}
                   onClose={closeReviewEmail}
                 />
               )}
@@ -592,7 +632,7 @@ export default function App() {
       </>
     );
   } catch (error) {
-    console.error("App component error:", error);
+    console.error("AuthenticatedApp error:", error);
     return (
       <div style={{ padding: "20px", color: "red" }}>
         <h2>Something went wrong</h2>
@@ -601,4 +641,15 @@ export default function App() {
       </div>
     );
   }
+}
+
+// Main App component with AuthProvider
+export default function App() {
+  return (
+    <AuthProvider>
+      <ErrorBoundary>
+        <AuthenticatedApp />
+      </ErrorBoundary>
+    </AuthProvider>
+  );
 }
