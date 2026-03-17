@@ -13,46 +13,42 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [token, setTokenState] = useState(localStorage.getItem('token'));
+
+  // Separate function to update token without triggering re-render
+  const setToken = (newToken) => {
+    localStorage.setItem('token', newToken);
+    setTokenState(newToken);
+  };
 
   useEffect(() => {
-    // Check if user is logged in on mount
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
-    
-    if (token && userData) {
-      try {
-        setUser(JSON.parse(userData));
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-      }
-    }
-    setLoading(false);
-  }, []);
-
-  const signUp = async (email, password, name) => {
-    try {
-      const response = await fetch('http://localhost:4000/api/auth/signup', {
-        method: 'POST',
+    if (token) {
+      // Verify token with server
+      fetch('http://localhost:4000/api/auth/me', {
         headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password, name }),
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success && data.data) {
+          setUser(data.data);
+        } else {
+          localStorage.removeItem('token');
+          setTokenState(null);
+        }
+      })
+      .catch(() => {
+        localStorage.removeItem('token');
+        setTokenState(null);
+      })
+      .finally(() => {
+        setLoading(false);
       });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        return { success: true, message: 'Account created successfully' };
-      } else {
-        throw new Error(data.message || 'Sign up failed');
-      }
-    } catch (error) {
-      console.error('Sign up error:', error);
-      return { success: false, error: error.message };
+    } else {
+      setLoading(false);
     }
-  };
+  }, []); // Run once on mount
 
   const login = async (email, password) => {
     try {
@@ -64,38 +60,57 @@ export const AuthProvider = ({ children }) => {
         body: JSON.stringify({ email, password }),
       });
 
-      if (!response.ok) {
-        throw new Error('Login failed');
-      }
-
       const data = await response.json();
-      
+
       if (data.success) {
-        localStorage.setItem('token', data.data.session.access_token);
-        localStorage.setItem('user', JSON.stringify(data.data.user));
+        const token = data.data.session.access_token;
+        localStorage.setItem('token', token);
+        setToken(token);
         setUser(data.data.user);
         return { success: true };
       } else {
-        throw new Error(data.message || 'Login failed');
+        return { success: false, message: data.message };
       }
     } catch (error) {
-      console.error('Login error:', error);
-      return { success: false, error: error.message };
+      return { success: false, message: 'Login failed' };
+    }
+  };
+
+  const signup = async (email, password, name) => {
+    try {
+      const response = await fetch('http://localhost:4000/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password, name }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        return { success: true };
+      } else {
+        return { success: false, message: data.message };
+      }
+    } catch (error) {
+      return { success: false, message: 'Signup failed' };
     }
   };
 
   const logout = () => {
     localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    setToken(null);
     setUser(null);
   };
 
   const value = {
     user,
     login,
-    signUp,
+    signup,
     logout,
     loading,
+    token,
     isAuthenticated: !!user
   };
 

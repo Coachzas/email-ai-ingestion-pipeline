@@ -8,31 +8,28 @@ const Login = () => {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
 
-  const { login, signUp } = useAuth();
+  const { login, signup } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    setSuccess('');
 
     try {
       let result;
       if (isLogin) {
         result = await login(email, password);
       } else {
-        result = await signUp(email, password, name);
+        result = await signup(email, password, name);
         if (result.success) {
-          setSuccess('สมัครสมาชิกสำเร็จ! กำลังเข้าสู่ระบบ...');
           // After successful signup, automatically login
           result = await login(email, password);
         }
       }
 
       if (!result.success) {
-        setError(result.error || result.message || 'เกิดข้อผิดพลาด');
+        setError(result.message);
       }
     } catch (error) {
       setError('เกิดข้อผิดพลาดในการเชื่อมต่อ');
@@ -147,37 +144,16 @@ const Login = () => {
             />
           </div>
 
-          {success && (
-            <div style={{
-              backgroundColor: '#28a745',
-              color: '#fff',
-              padding: '15px',
-              borderRadius: '4px',
-              marginBottom: '20px',
-              fontSize: '14px',
-              lineHeight: '1.4'
-            }}>
-              <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>
-                สำเร็จ!
-              </div>
-              <div>{success}</div>
-            </div>
-          )}
-
           {error && (
             <div style={{
               backgroundColor: '#dc3545',
               color: '#fff',
-              padding: '15px',
+              padding: '10px',
               borderRadius: '4px',
               marginBottom: '20px',
-              fontSize: '14px',
-              lineHeight: '1.4'
+              fontSize: '14px'
             }}>
-              <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>
-                {isLogin ? 'เข้าสู่ระบบไม่สำเร็จ' : 'สมัครสมาชิกไม่สำเร็จ'}
-              </div>
-              <div>{error}</div>
+              {error}
             </div>
           )}
 
@@ -207,7 +183,6 @@ const Login = () => {
             onClick={() => {
               setIsLogin(!isLogin);
               setError('');
-              setSuccess('');
               setName('');
             }}
             style={{
