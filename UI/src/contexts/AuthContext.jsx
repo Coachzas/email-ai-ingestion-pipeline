@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { API_ENDPOINTS, STORAGE_KEYS } from '../constants';
 
 const AuthContext = createContext();
 
@@ -13,18 +14,18 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [token, setTokenState] = useState(localStorage.getItem('token'));
+  const [token, setTokenState] = useState(localStorage.getItem(STORAGE_KEYS.TOKEN));
 
   // Separate function to update token without triggering re-render
   const setToken = (newToken) => {
-    localStorage.setItem('token', newToken);
+    localStorage.setItem(STORAGE_KEYS.TOKEN, newToken);
     setTokenState(newToken);
   };
 
   useEffect(() => {
     if (token) {
       // Verify token with server
-      fetch('http://localhost:4000/api/auth/me', {
+      fetch(API_ENDPOINTS.AUTH.ME, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -34,12 +35,12 @@ export const AuthProvider = ({ children }) => {
         if (data.success && data.data) {
           setUser(data.data);
         } else {
-          localStorage.removeItem('token');
+          localStorage.removeItem(STORAGE_KEYS.TOKEN);
           setTokenState(null);
         }
       })
       .catch(() => {
-        localStorage.removeItem('token');
+        localStorage.removeItem(STORAGE_KEYS.TOKEN);
         setTokenState(null);
       })
       .finally(() => {
@@ -52,7 +53,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const response = await fetch('http://localhost:4000/api/auth/signin', {
+      const response = await fetch(API_ENDPOINTS.AUTH.SIGNIN, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -64,7 +65,6 @@ export const AuthProvider = ({ children }) => {
 
       if (data.success) {
         const token = data.data.session.access_token;
-        localStorage.setItem('token', token);
         setToken(token);
         setUser(data.data.user);
         return { success: true };
@@ -78,7 +78,7 @@ export const AuthProvider = ({ children }) => {
 
   const signup = async (email, password, name) => {
     try {
-      const response = await fetch('http://localhost:4000/api/auth/signup', {
+      const response = await fetch(API_ENDPOINTS.AUTH.SIGNUP, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -99,7 +99,6 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
     setToken(null);
     setUser(null);
   };

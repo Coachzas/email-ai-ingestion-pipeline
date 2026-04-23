@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { formatDate, formatFileSize } from '../utils';
 
 const FileUpload = () => {
   const { token } = useAuth();
@@ -7,8 +8,6 @@ const FileUpload = () => {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [fileData, setFileData] = useState(null);
-  const [showFileData, setShowFileData] = useState(false);
 
   useEffect(() => {
     fetchFiles();
@@ -144,45 +143,12 @@ const FileUpload = () => {
     }
   };
 
-  const handleViewData = async (file) => {
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/file-upload/${file.id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      const result = await response.json();
 
-      if (result.success) {
-        setFileData(result.data);
-        setShowFileData(true);
-      } else {
-        alert(`❌ เกิดข้อผิดพลาด: ${result.message}`);
-      }
-    } catch (error) {
-      console.error('Read file error:', error);
-      alert('❌ เกิดข้อผิดพลาดในการอ่านไฟล์');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString('th-TH');
-  };
-
+  
+  
   return (
     <div style={{ padding: '20px' }}>
-      <h2>📁 จัดการไฟล์ CSV/Excel</h2>
+      <h2>📁 เกณฑ์ที่ใช้เปรียบเทียบ CSV/Excel</h2>
       
       {/* Upload Section */}
       <div style={{
@@ -286,21 +252,6 @@ const FileUpload = () => {
                     </td>
                     <td style={{ padding: '10px', textAlign: 'center' }}>
                       <button
-                        onClick={() => handleViewData(file)}
-                        style={{
-                          padding: '4px 8px',
-                          backgroundColor: '#007bff',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: '3px',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                          marginRight: '5px'
-                        }}
-                      >
-                        ดูข้อมูล
-                      </button>
-                      <button
                         onClick={() => handleDelete(file)}
                         style={{
                           padding: '4px 8px',
@@ -323,99 +274,6 @@ const FileUpload = () => {
         )}
       </div>
 
-      {/* File Data Modal */}
-      {showFileData && fileData && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            backgroundColor: '#1a1a1a',
-            border: '1px solid #333',
-            borderRadius: '8px',
-            padding: '20px',
-            maxWidth: '90vw',
-            maxHeight: '90vh',
-            overflow: 'auto',
-            minWidth: '600px'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-              <h3>📊 ข้อมูลไฟล์: {fileData.fileName}</h3>
-              <button
-                onClick={() => setShowFileData(false)}
-                style={{
-                  backgroundColor: '#dc3545',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  padding: '5px 10px',
-                  cursor: 'pointer'
-                }}
-              >
-                ✕
-              </button>
-            </div>
-
-            {fileData.sheets.map((sheet, sheetIndex) => (
-              <div key={sheetIndex} style={{ marginBottom: '20px' }}>
-                <h4>Sheet: {sheet.sheetName}</h4>
-                <div style={{ fontSize: '12px', color: '#bbb', marginBottom: '10px' }}>
-                  จำนวนแถว: {sheet.rowCount} | คอลัมน์: {sheet.columns.join(', ')}
-                </div>
-                
-                {sheet.preview.length > 0 && (
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{
-                      width: '100%',
-                      borderCollapse: 'collapse',
-                      fontSize: '12px',
-                      backgroundColor: '#222'
-                    }}>
-                      <thead>
-                        <tr style={{ backgroundColor: '#333' }}>
-                          {sheet.columns.map((col, colIndex) => (
-                            <th key={colIndex} style={{
-                              padding: '8px',
-                              textAlign: 'left',
-                              border: '1px solid #444',
-                              fontWeight: 'bold'
-                            }}>
-                              {col}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sheet.preview.map((row, rowIndex) => (
-                          <tr key={rowIndex}>
-                            {sheet.columns.map((col, colIndex) => (
-                              <td key={colIndex} style={{
-                                padding: '6px 8px',
-                                border: '1px solid #444',
-                                color: '#fff'
-                              }}>
-                                {row[col] || '-'}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

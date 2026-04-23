@@ -1,19 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useBatchProgress } from "../hooks/useBatchProgress.js";
-const formatDate = (dateString) => {
-  try {
-    return new Date(dateString).toLocaleString("th-TH", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return dateString;
-  }
-};
+import { formatDate } from "../utils";
 
 export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
   const [items, setItems] = useState([]);
@@ -29,7 +17,7 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
   });
 
   // Use batch progress
-  const { isProcessing, currentPhase, getPhaseText } = useBatchProgress();
+  const { isProcessing, currentPhase, currentItem, getPhaseText } = useBatchProgress();
 
   const [q, setQ] = useState("");
   const [hasAttachments, setHasAttachments] = useState("");
@@ -243,7 +231,7 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
         <div className="batch-progress-indicator">
           <div className="batch-progress-content">
             <div className="batch-progress-spinner"></div>
-            <span className="batch-progress-text">🔄 {getPhaseText()}</span>
+            <span className="batch-progress-text">🔄 {getPhaseText()}{currentItem ? `: ${currentItem}` : ''}</span>
           </div>
         </div>
       )}

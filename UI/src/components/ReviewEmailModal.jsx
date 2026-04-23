@@ -1,25 +1,35 @@
 import React, { useEffect, useState } from 'react'
 import LoadingSpinner from './LoadingSpinner.jsx'
-
-const formatDate = (dateString) => {
-  try {
-    return new Date(dateString).toLocaleString('th-TH', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  } catch {
-    return dateString
-  }
-}
+import { formatDate } from '../utils'
 
 export default function ReviewEmailModal({ email, onClose }) {
   console.log('ReviewEmailModal rendered with email:', email);
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [emailDetail, setEmailDetail] = useState(null)
+
+  const handleDownload = async (attachmentId, fileName) => {
+    try {
+      const response = await fetch(`/api/review/attachments/${attachmentId}/download`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to download file');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Failed to download file: ' + error.message);
+    }
+  }
 
   useEffect(() => {
     if (!email) return
@@ -124,14 +134,12 @@ export default function ReviewEmailModal({ email, onClose }) {
                             })()}
                           </div>
                           <div className="attachment-actions">
-                            <a
+                            <button
                               className="attachment-download"
-                              href={`/api/review/attachments/${att.id}/download`}
-                              target="_blank"
-                              rel="noreferrer"
+                              onClick={() => handleDownload(att.id, att.originalFileName || att.fileName || 'download')}
                             >
                               ⬇️ Download
-                            </a>
+                            </button>
                           </div>
                         </div>
 

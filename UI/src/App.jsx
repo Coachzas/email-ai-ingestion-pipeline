@@ -293,7 +293,7 @@ function AuthenticatedApp() {
               >
                 📊 Token Usage
               </button>
-              <button
+              {/* <button
                 onClick={() => setCurrentView("upload")}
                 style={{
                   padding: "8px 16px",
@@ -306,8 +306,8 @@ function AuthenticatedApp() {
                   cursor: "pointer",
                 }}
               >
-                📁 File Upload
-              </button>
+                📁 Career Position
+              </button> */}
               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={{ color: '#bbb', fontSize: '14px' }}>
                   สวัสดี, {user?.name || user?.email}
