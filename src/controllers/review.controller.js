@@ -293,10 +293,57 @@ async function downloadAttachment(req, res) {
       });
     }
 
+    // Check if file is stored in Supabase
+    if (attachment.cloudProvider === 'supabase' && attachment.cloudPath) {
+      // Download from Supabase Storage
+      const { supabase } = require('../utils/supabase');
+      
+      const { data, error } = await supabase.storage
+        .from('attachments')
+        .download(attachment.cloudPath);
+
+      if (error) {
+        console.error('Supabase download error:', error);
+        return res.status(404).json({
+          status: 'error',
+          message: 'File not found in cloud storage'
+        });
+      }
+
+      // Set appropriate headers
+      const mimeType = attachment.fileType || 'application/octet-stream';
+      res.setHeader('Content-Type', mimeType);
+      
+      // Encode filename for Content-Disposition header
+      const encodedFileName = encodeURIComponent(attachment.fileName || 'download');
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedFileName}`);
+      
+      // Handle different data types from Supabase
+      let fileBuffer;
+      if (data instanceof ArrayBuffer) {
+        fileBuffer = Buffer.from(data);
+      } else if (data instanceof Blob) {
+        fileBuffer = Buffer.from(await data.arrayBuffer());
+      } else if (Buffer.isBuffer(data)) {
+        fileBuffer = data;
+      } else {
+        fileBuffer = Buffer.from(data || '');
+      }
+      
+      // Set Content-Length if we have the buffer
+      if (fileBuffer && fileBuffer.length > 0) {
+        res.setHeader('Content-Length', fileBuffer.length);
+      }
+
+      // Send file data
+      return res.send(fileBuffer);
+    }
+
+    // Fallback to local file system
     const fs = require('fs');
     const path = require('path');
 
-    const filePath = attachment.filePath; // ใช้ path ที่เก็บไว้ในฐานข้อมูลโดยตรง
+    const filePath = attachment.filePath;
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({
         status: 'error',
@@ -315,6 +362,7 @@ async function downloadAttachment(req, res) {
       }
     });
   } catch (error) {
+    console.error('Download attachment error:', error);
     res.status(500).json({
       status: 'error',
       message: error.message

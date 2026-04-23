@@ -22,6 +22,8 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
   const [q, setQ] = useState("");
   const [hasAttachments, setHasAttachments] = useState("");
   const [ocrStatus, setOcrStatus] = useState("");
+  const [emailType, setEmailType] = useState(""); // เพิ่ม state สำหรับประเภทอีเมล
+  const [batchFilterType, setBatchFilterType] = useState(""); // เพิ่ม state สำหรับประเภท batch scheduler
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
@@ -40,6 +42,7 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
     if (q && q.trim().length > 0) params.set("q", q.trim());
     if (hasAttachments !== "") params.set("hasAttachments", hasAttachments);
     if (ocrStatus !== "") params.set("ocrStatus", ocrStatus);
+    if (batchFilterType !== "") params.set("batchFilterType", batchFilterType); // เพิ่ม batch filter type
     if (fromDate) params.set("fromDate", fromDate);
     if (toDate) {
       // When toDate is the same as fromDate, we need to include the entire day
@@ -54,6 +57,7 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
     q,
     hasAttachments,
     ocrStatus,
+    batchFilterType, // เพิ่ม batchFilterType
     fromDate,
     toDate,
     refreshTrigger,
@@ -279,6 +283,20 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
 
           <div className="review-filter">
             <label>
+              🎯 ประเภทอีเมล
+              <select
+                value={batchFilterType}
+                onChange={(e) => setBatchFilterType(e.target.value)}
+              >
+                <option value="">ทั้งหมด</option>
+                <option value="JOB_ONLY">🔍 เฉพาะสมัครงาน</option>
+                <option value="ALL">📧 ทั้งหมด</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="review-filter">
+            <label>
               วันที่เริ่มต้น
               <input
                 type="date"
@@ -369,6 +387,7 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
                     <th>วันที่รับ</th>
                     <th>From</th>
                     <th>Subject</th>
+                    <th>🎯 ประเภทอีเมล</th>
                     <th>ไฟล์แนบ</th>
                     <th>จัดการ</th>
                   </tr>
@@ -376,7 +395,7 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
                 <tbody>
                   {isLoading && (
                     <tr>
-                      <td colSpan={7} className="review-empty">
+                      <td colSpan={8} className="review-empty">
                         กำลังโหลด...
                       </td>
                     </tr>
@@ -384,7 +403,7 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
 
                   {!isLoading && items.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="review-empty">
+                      <td colSpan={8} className="review-empty">
                         ไม่มีอีเมลในบัญชีนี้
                       </td>
                     </tr>
@@ -411,6 +430,9 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
                           <td className="review-cell-muted">{row.fromEmail}</td>
                           <td className="review-cell-subject">
                             {row.subject || "(no subject)"}
+                          </td>
+                          <td className="review-cell-batch-type">
+                            {row.batchFilterType === "JOB_ONLY" ? "🔍 สมัครงาน" : row.batchFilterType === "ALL" ? "📧 ทั้งหมด" : "-"}
                           </td>
                           <td>{row.attachmentCount}</td>
                           <td onClick={(e) => e.stopPropagation()}>
@@ -525,6 +547,18 @@ export default function ReviewQueue({ onOpenEmail, onItemsChange }) {
           padding: 8px 12px;
           border: 1px solid #ddd;
           border-radius: 4px;
+        }
+
+        .review-cell-batch-type {
+          text-align: center;
+          font-size: 12px;
+          font-weight: 600;
+          color: #555;
+          background: #f9f9f9;
+          border-radius: 4px;
+          padding: 4px 8px;
+          min-width: 120px;
+        }
           font-size: 14px;
         }
 

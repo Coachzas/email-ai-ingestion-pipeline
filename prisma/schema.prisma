@@ -49,6 +49,7 @@ model BatchScheduler {
   customMinute Int?
   startDate    DateTime
   endDate      DateTime?
+  filterType   FilterType     @default(ALL)
   isActive     Boolean        @default(true)
   lastRunAt    DateTime?
   nextRunAt    DateTime?
@@ -85,7 +86,7 @@ model BatchRun {
 
 model Attachment {
   id            String     @id @default(uuid())
-  emailId       String
+  emailId       String?
   userId        String?    // Add user isolation
   fileName      String
   originalFileName String? // Original filename with Thai characters
@@ -97,7 +98,7 @@ model Attachment {
   extractedText String?
   ocrStatus     OcrStatus?
   createdAt     DateTime   @default(now())
-  email         Email      @relation(fields: [emailId], references: [id])
+  email         Email?     @relation(fields: [emailId], references: [id])
   user          User?      @relation(fields: [userId], references: [id])
 }
 
@@ -141,4 +142,9 @@ enum BatchRunStatus {
   RUNNING
   COMPLETED
   FAILED
+}
+
+enum FilterType {
+  ALL
+  JOB_ONLY
 }

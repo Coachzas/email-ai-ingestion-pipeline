@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { uploadFile, getUploadedFiles, deleteFile, readFileData, renameFile } = require('../controllers/file-upload.controller');
+const { uploadFile, getUploadedFiles, deleteFile, renameFile } = require('../controllers/file-upload.controller');
 const { verifyUser } = require('../controllers/auth.controller');
 const multer = require('multer');
 const path = require('path');
@@ -42,8 +42,6 @@ router.get('/', getUploadedFiles);
 // ลบไฟล์
 router.delete('/:fileId', deleteFile);
 
-// อ่านข้อมูลจากไฟล์
-router.get('/:fileId', readFileData);
 
 // เปลี่ยนชื่อไฟล์
 router.put('/:fileId', renameFile);

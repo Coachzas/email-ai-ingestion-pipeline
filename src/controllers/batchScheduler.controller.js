@@ -14,7 +14,7 @@ const prisma = new PrismaClient();
 const activeJobs = new Map();
 
 // สร้าง Batch Scheduler
-exports.createScheduler = async (req, res) => {
+const createScheduler = async (req, res) => {
   try {
     const {
       name,
@@ -24,8 +24,11 @@ exports.createScheduler = async (req, res) => {
       customMinute,
       startDate,
       endDate,
-      selectedDays
+      selectedDays,
+      filterType
     } = req.body;
+
+    console.log('🔍 Create Scheduler - filterType:', filterType); // Debug log
 
     const parsedStartDate = startDate ? new Date(startDate) : null;
     const parsedEndDate = endDate ? new Date(endDate) : null;
@@ -76,6 +79,7 @@ exports.createScheduler = async (req, res) => {
         customMinute: scheduleTypeEnum === 'CUSTOM' || scheduleTypeEnum === 'DAILY' ? customMinute : null,
         startDate: parsedStartDate,
         endDate: parsedEndDate,
+        filterType: filterType || 'ALL', // เพิ่ม filterType
         nextRunAt,
         isActive: true, // ให้ scheduler ใหม่เป็น active โดยอัตโนมัติ
         // Store custom schedule fields as JSON
@@ -109,7 +113,7 @@ exports.createScheduler = async (req, res) => {
 };
 
 // ดึงข้อมูล Batch Scheduler ทั้งหมด
-exports.getAllSchedulers = async (req, res) => {
+const getAllSchedulers = async (req, res) => {
   try {
     const schedulers = await prisma.batchScheduler.findMany({
       orderBy: { createdAt: 'desc' }
@@ -140,8 +144,11 @@ exports.getAllSchedulers = async (req, res) => {
           totalRuns,
           lastRun,
           selectedDays: scheduler.selectedDays ? JSON.parse(scheduler.selectedDays) : [],
-          dayTimeSlots: scheduler.dayTimeSlots ? JSON.parse(scheduler.dayTimeSlots) : {}
+          dayTimeSlots: scheduler.dayTimeSlots ? JSON.parse(scheduler.dayTimeSlots) : {},
+          filterType: scheduler.filterType || 'ALL' // เพิ่ม filterType ใน response
         };
+
+        console.log('🔍 Get Schedulers - filterType:', scheduler.filterType); // Debug log
 
         return parsedScheduler;
       })
@@ -162,7 +169,7 @@ exports.getAllSchedulers = async (req, res) => {
 };
 
 // อัปเดต Batch Scheduler
-exports.updateScheduler = async (req, res) => {
+const updateScheduler = async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -173,8 +180,11 @@ exports.updateScheduler = async (req, res) => {
       customMinute,
       startDate,
       endDate,
-      selectedDays
+      selectedDays,
+      filterType
     } = req.body;
+
+    console.log('🔍 Update Scheduler - filterType:', filterType); // Debug log
 
     const parsedStartDate = startDate ? new Date(startDate) : null;
     const parsedEndDate = endDate ? new Date(endDate) : null;
@@ -221,6 +231,7 @@ exports.updateScheduler = async (req, res) => {
         customMinute: scheduleTypeEnum === 'CUSTOM' || scheduleTypeEnum === 'DAILY' ? customMinute : null,
         startDate: parsedStartDate,
         endDate: parsedEndDate,
+        filterType: filterType || 'ALL', // เพิ่ม filterType
         nextRunAt,
         // Store custom schedule fields as JSON
         selectedDays: scheduleTypeEnum === 'CUSTOM' ? JSON.stringify(selectedDays || []) : null,
@@ -252,7 +263,7 @@ exports.updateScheduler = async (req, res) => {
 };
 
 // ลบ Batch Scheduler
-exports.deleteScheduler = async (req, res) => {
+const deleteScheduler = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -507,7 +518,8 @@ async function executeBatch(scheduler) {
             offset: currentOffset,
             returnMeta: true,
             logger: (msg) => logger.log(`[IMAP] ${msg}`)
-          }
+          },
+          scheduler.filterType || 'ALL' // ส่ง filterMode จาก scheduler
         );
 
         console.log(`📧 IMAP fetch done: totalUids=${fetchResult?.totalUids ?? 0}, fetchedUids=${fetchResult?.fetchedUids ?? 0}, saved=${fetchResult?.savedCount ?? 0}, existing=${fetchResult?.existingCount ?? 0}`);
@@ -645,7 +657,7 @@ async function executeBatch(scheduler) {
 }
 
 // รัน scheduler ทันที (ไม่ต้องรอ cron)
-exports.runSchedulerNow = async (req, res) => {
+const runSchedulerNow = async (req, res) => {
   try {
     const { id } = req.params;
     const scheduler = await prisma.batchScheduler.findUnique({ where: { id } });
@@ -804,7 +816,7 @@ function calculateNextRunTime(scheduleType, customHour, customMinute, selectedDa
 }
 
 // GET สถานะ batch ทั้งหมด
-exports.getBatchStatus = async (req, res) => {
+const getBatchStatus = async (req, res) => {
   try {
     const schedulers = await prisma.batchScheduler.findMany({
       where: { isActive: true }
@@ -864,7 +876,7 @@ exports.getBatchStatus = async (req, res) => {
 };
 
 // ตั้งค่า Active Scheduler เดียว
-exports.setActiveScheduler = async (req, res) => {
+const setActiveScheduler = async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -941,7 +953,7 @@ exports.setActiveScheduler = async (req, res) => {
 };
 
 // เริ่ม schedulers ทั้งหมดเมื่อ server start
-exports.initializeSchedulers = async () => {
+const initializeSchedulers = async () => {
   try {
     const schedulers = await prisma.batchScheduler.findMany({
       where: { isActive: true }
@@ -960,7 +972,7 @@ exports.initializeSchedulers = async () => {
 };
 
 // ดึงประวัติการรัน batch ทั้งหมด
-exports.getBatchHistory = async (req, res) => {
+const getBatchHistory = async (req, res) => {
   try {
     const { limit = 50, offset = 0 } = req.query;
     
@@ -1042,13 +1054,13 @@ exports.getBatchHistory = async (req, res) => {
 };
 
 module.exports = {
-  createScheduler: exports.createScheduler,
-  updateScheduler: exports.updateScheduler,
-  getAllSchedulers: exports.getAllSchedulers,
-  deleteScheduler: exports.deleteScheduler,
-  setActiveScheduler: exports.setActiveScheduler,
-  initializeSchedulers: exports.initializeSchedulers,
-  getBatchStatus: exports.getBatchStatus,
-  runSchedulerNow: exports.runSchedulerNow,
-  getBatchHistory: exports.getBatchHistory
+  createScheduler,
+  updateScheduler,
+  getAllSchedulers,
+  deleteScheduler,
+  setActiveScheduler,
+  initializeSchedulers,
+  getBatchStatus,
+  runSchedulerNow,
+  getBatchHistory
 };

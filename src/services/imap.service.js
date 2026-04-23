@@ -58,7 +58,7 @@ async function connectWithRetry(client, config, maxRetries = 3) {
 }
 
 //ฟังก์ชันสำหรับเชื่อมต่อและดึงข้อมูลอีเมล ผ่านไลบรารีที่ชื่อว่า Imapflow
-async function fetchEmails(startDate, endDate, accountConfig = null, options = {}) {
+async function fetchEmails(startDate, endDate, accountConfig = null, options = {}, filterMode = 'ALL') {
   const config = accountConfig || {
     host: process.env.IMAP_HOST,
     port: process.env.IMAP_PORT,
@@ -81,29 +81,71 @@ async function fetchEmails(startDate, endDate, accountConfig = null, options = {
     client = await connectWithRetry(client, config);
     log(`📧 IMAP connected successfully to ${config.host}:${config.port}`);
 
-    let searchQuery = { all: true };
+    let searchQuery = { all: true }; // ค่าเริ่มต้น
+  
+  if (filterMode === 'JOB_ONLY') {
+    searchQuery = {
+      or: [
+        { subject: "สมัครงาน" },
+        { subject: "Resume" },
+        { subject: "CV" },
+        { subject: "Job Application" },
+        { subject: "resume" },
+        { subject: "cv" },
+        { subject: "job application" }
+      ]
+    };
+  }
 
-    log(`📧 fetchEmails params: startDate=${startDate || '-'} endDate=${endDate || '-'}`);
+    log(`📧 fetchEmails params: startDate=${startDate || '-'} endDate=${endDate || '-'} filterMode=${filterMode}`);
 
     if (startDate || endDate) {
-      searchQuery = {};
-      if (startDate) {
-        const startThaiDate = new Date(startDate);
-        // ถอยหลังไป 1 วันสำหรับ IMAP Search เพื่อให้ครอบคลุมเวลาไทยที่เร็วกว่า UTC
-        const safetyDate = new Date(startThaiDate);
-        safetyDate.setDate(safetyDate.getDate() - 1);
-        const y = safetyDate.getFullYear();
-        const m = String(safetyDate.getMonth() + 1).padStart(2, "0");
-        const d = String(safetyDate.getDate()).padStart(2, "0");
-        searchQuery.since = `${y}-${m}-${d}`;
-      }
-      if (endDate) {
-        const endThaiDate = new Date(endDate);
-        endThaiDate.setDate(endThaiDate.getDate() + 1);
-        const y = endThaiDate.getFullYear();
-        const m = String(endThaiDate.getMonth() + 1).padStart(2, "0");
-        const d = String(endThaiDate.getDate()).padStart(2, "0");
-        searchQuery.before = `${y}-${m}-${d}`;
+      if (filterMode === 'JOB_ONLY') {
+        searchQuery = {
+          and: [
+            searchQuery,
+            {}
+          ]
+        };
+        
+        if (startDate) {
+          const startThaiDate = new Date(startDate);
+          // ถอยหลังไป 1 วันสำหรับ IMAP Search เพื่อให้ครอบคลุมเวลาไทยที่เร็วกว่า UTC
+          const safetyDate = new Date(startThaiDate);
+          safetyDate.setDate(safetyDate.getDate() - 1);
+          const y = safetyDate.getFullYear();
+          const m = String(safetyDate.getMonth() + 1).padStart(2, "0");
+          const d = String(safetyDate.getDate()).padStart(2, "0");
+          searchQuery.and[1].since = `${y}-${m}-${d}`;
+        }
+        if (endDate) {
+          const endThaiDate = new Date(endDate);
+          endThaiDate.setDate(endThaiDate.getDate() + 1);
+          const y = endThaiDate.getFullYear();
+          const m = String(endThaiDate.getMonth() + 1).padStart(2, "0");
+          const d = String(endThaiDate.getDate()).padStart(2, "0");
+          searchQuery.and[1].before = `${y}-${m}-${d}`;
+        }
+      } else {
+        // ALL mode - ใช้ date filter โดยตรง
+        if (startDate) {
+          const startThaiDate = new Date(startDate);
+          // ถอยหลังไป 1 วันสำหรับ IMAP Search เพื่อให้ครอบคลุมเวลาไทยที่เร็วกว่า UTC
+          const safetyDate = new Date(startThaiDate);
+          safetyDate.setDate(safetyDate.getDate() - 1);
+          const y = safetyDate.getFullYear();
+          const m = String(safetyDate.getMonth() + 1).padStart(2, "0");
+          const d = String(safetyDate.getDate()).padStart(2, "0");
+          searchQuery.since = `${y}-${m}-${d}`;
+        }
+        if (endDate) {
+          const endThaiDate = new Date(endDate);
+          endThaiDate.setDate(endThaiDate.getDate() + 1);
+          const y = endThaiDate.getFullYear();
+          const m = String(endThaiDate.getMonth() + 1).padStart(2, "0");
+          const d = String(endThaiDate.getDate()).padStart(2, "0");
+          searchQuery.before = `${y}-${m}-${d}`;
+        }
       }
     }
 
@@ -133,8 +175,10 @@ async function fetchEmails(startDate, endDate, accountConfig = null, options = {
     log(`📧 Found ${existingUidSet.size} existing UIDs in database`);
 
     // ดึงอีเมลทีละฉบับตาม UID ที่ได้มา (normal mode)
-    const uidsToFetch = limit !== null ? lastUids.slice(offset, offset + limit) : lastUids.slice(offset);
+    const uidsWindow = limit !== null ? lastUids.slice(offset, offset + limit) : lastUids.slice(offset);
+    const uidsToFetch = uidsWindow.filter((uid) => !existingUidSet.has(uid));
     log(`📧 Starting to fetch ${uidsToFetch.length} emails (offset=${offset}, limit=${limit})...`);
+    log(`📧 Skipped ${uidsWindow.length - uidsToFetch.length} emails already in database`);
 
     // อัปเดต fetching progress เริ่มต้น
     if (global.updateFetchingProgress) {
@@ -144,6 +188,7 @@ async function fetchEmails(startDate, endDate, accountConfig = null, options = {
     let savedCount = 0;
     let existingCount = 0;
     let fetchedCount = 0; // นับจำนวนที่ดึงมาแล้ว
+    let dateFilteredCount = 0;
     let connectionErrors = 0;
     const maxConnectionErrors = 5; // จำกัด connection errors
 
@@ -173,15 +218,25 @@ async function fetchEmails(startDate, endDate, accountConfig = null, options = {
           }
         }
 
-        // เช็คว่า UID นี้เคยเก็บแล้วหรือยัง (ใช้ Set สำหรับ O(1) lookup)
-        if (existingUidSet.has(uid)) {
-          existingCount += 1;
-          continue;
-        }
-
         const msg = await client.fetchOne(uid, { source: true });
         const parsed = await simpleParser(msg.source); // simpleParser จะทำหน้าที่ ถอดรหัส ให้กลายเป็น Object
         
+        // กรองอีเมลสมัครงานก่อนบันทึก (Process Filtering)
+        const subject = (parsed.subject || "").toLowerCase();
+        const body = (parsed.text || "").toLowerCase();
+        const isJobRelated = subject.includes("สมัครงาน") || 
+                           subject.includes("resume") || 
+                           subject.includes("cv") ||
+                           subject.includes("job application") ||
+                           body.includes("สมัครงาน") ||
+                           body.includes("resume") ||
+                           body.includes("job application");
+
+        if (!isJobRelated) {
+          log(`⏭️ Skipped non-job email: ${subject}`);
+          continue; // ข้ามไปอีเมลฉบับถัดไปเลย ไม่บันทึก ไม่ทำ OCR
+        }
+
         // อัปเดต fetching progress ด้วย subject หลังจาก parse เสร็จ
         if (global.updateFetchingProgress) {
           const subject = parsed.subject || '(ไม่มีหัวข้อ)';
@@ -199,7 +254,10 @@ async function fetchEmails(startDate, endDate, accountConfig = null, options = {
             (startFilter && receivedAt < startFilter) ||
             (endFilter && receivedAt > endFilter)
           )
+          {
+            dateFilteredCount += 1;
             continue;
+          }
         }
 
         const email = await prisma.email.create({
@@ -228,9 +286,10 @@ async function fetchEmails(startDate, endDate, accountConfig = null, options = {
           for (const file of parsed.attachments) {
             try {
               // อัปโหลดไฟล์ไป Supabase Storage
+              const fallbackFilename = file.filename || `unknown_${Date.now()}`;
               const uploadResult = await storageService.uploadAttachment(
                 null, // ไม่มี local path
-                file.filename,
+                fallbackFilename,
                 accountConfig?.userId || '00000000-0000-0000-0000-000000000001', // ใช้ userId ของ account หรือ admin
                 email.id,
                 file.content, // ส่ง buffer ของไฟล์
@@ -238,10 +297,10 @@ async function fetchEmails(startDate, endDate, accountConfig = null, options = {
               );
               
               // สร้าง attachment record ใน database
-              await prisma.attachment.create({
+              const attachment = await prisma.attachment.create({
                 data: {
                   emailId: email.id,
-                  fileName: file.filename, // Original Thai filename
+                  fileName: fallbackFilename, // Fallback filename if undefined
                   originalFileName: file.filename, // เก็บชื่อไฟล์ต้นฉบับภาษาไทย
                   fileType: file.contentType,
                   filePath: uploadResult.path, // UUID-based path
@@ -251,6 +310,24 @@ async function fetchEmails(startDate, endDate, accountConfig = null, options = {
                   userId: email.userId || accountConfig?.userId // ใช้ userId จาก email ก่อน
                 },
               });
+
+              // Trigger OCR สำหรับ PDF และไฟล์ภาพ (Attachment Filtering)
+              // ตรวจสอบขนาดไฟล์ร่วมด้วย (เช่น > 50KB) เพื่อเลี่ยงพวก icon เล็กๆ ในอีเมล
+              if (file.contentType && 
+                  (file.contentType.includes('pdf') || file.contentType.includes('image/')) && 
+                  file.content.length > 50000) {
+                try {
+                  const { processAttachment } = require('./attachment-ocr.service');
+                  // Trigger OCR ใน background ไม่ต้องรอผล
+                  processAttachment(attachment).catch(err => {
+                    console.log(`⚠️ OCR failed for attachment ${attachment.id}:`, err?.message || err);
+                  });
+                } catch (ocrErr) {
+                  console.log(`⚠️ Failed to trigger OCR for attachment ${attachment.id}:`, ocrErr?.message || ocrErr);
+                }
+              } else if (file.contentType && (file.contentType.includes('pdf') || file.contentType.includes('image/'))) {
+                log(`⏭️ Skipped small attachment for OCR: ${file.filename} (${file.content.length} bytes)`);
+              }
             } catch (fileErr) {
               log(`❌ Attachment save failed (uid=${uid}, filename=${file?.filename || 'unknown'}): ${fileErr?.message || fileErr}`);
             }

@@ -4,6 +4,7 @@ const fs = require('fs');
 const prisma = require('../utils/prisma');
 const storageService = require('../services/storage.service');
 const { verifyUser } = require('../controllers/auth.controller');
+const XLSX = require('xlsx');
 
 // Configure multer for memory storage (สำหรับ upload ตรงไป Supabase)
 const upload = multer({
@@ -111,6 +112,26 @@ const uploadFile = async (req, res) => {
       cloudProvider: cloudUploadResult.publicUrl ? 'supabase' : 'local'
     };
 
+    // บันทึกข้อมูลไฟล์ลง Prisma database
+    try {
+      await prisma.attachment.create({
+        data: {
+          userId: userId,
+          fileName: fileName,
+          originalFileName: req.file.originalname,
+          fileType: req.file.mimetype,
+          filePath: cloudUploadResult.path,
+          cloudPath: cloudUploadResult.path,
+          cloudProvider: cloudUploadResult.publicUrl ? 'supabase' : null,
+          size: fileSize
+        }
+      });
+      console.log(`✅ File metadata saved to database: ${fileName}`);
+    } catch (dbError) {
+      console.error('Failed to save file metadata to database:', dbError);
+      // Continue with response even if DB save fails
+    }
+
     // ลบ temp file ถ้ามี (ไม่ต้องการเพราะใช้ memory storage)
     // if (fs.existsSync(filePath)) {
     //   fs.unlinkSync(filePath);
@@ -160,7 +181,6 @@ const getUploadedFiles = async (req, res) => {
         id: true,
         fileName: true,
         cloudPath: true,
-        publicUrl: true,
         size: true,
         createdAt: true,
         cloudProvider: true
@@ -175,7 +195,6 @@ const getUploadedFiles = async (req, res) => {
       filePath: file.cloudPath || file.filePath, // ใช้ cloud path ถ้ามี
       fileSize: file.size,
       uploadDate: file.createdAt,
-      publicUrl: file.publicUrl,
       cloudProvider: file.cloudProvider
     }));
 
@@ -251,83 +270,6 @@ const deleteFile = async (req, res) => {
   }
 };
 
-// อ่านข้อมูลจากไฟล์จาก Supabase Storage
-const readFileData = async (req, res) => {
-  try {
-    // ตรวจสอบ user authentication
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication required'
-      });
-    }
-
-    const { fileId } = req.params;
-    const userId = req.user.id;
-
-    // ค้นหาไฟล์ใน database
-    const file = await prisma.attachment.findFirst({
-      where: {
-        id: fileId,
-        userId: userId
-      }
-    });
-
-    if (!file) {
-      return res.status(404).json({
-        success: false,
-        message: 'ไม่พบไฟล์'
-      });
-    }
-
-    // ดาวน์โหลดไฟล์จาก Supabase Storage
-    let tempFilePath;
-    try {
-      tempFilePath = path.join(__dirname, '../../temp', file.fileName);
-      await storageService.downloadFile(file.cloudPath, tempFilePath);
-    } catch (downloadError) {
-      console.error('Failed to download from Supabase:', downloadError);
-      return res.status(500).json({
-        success: false,
-        message: 'ไม่สามารถดาวน์โหลดไฟล์จาก cloud storage ได้'
-      });
-    }
-
-    // อ่านข้อมูลจากไฟล์
-    const workbook = XLSX.readFile(tempFilePath);
-    const sheetNames = workbook.SheetNames;
-    
-    const sheets = sheetNames.map(sheetName => {
-      const worksheet = workbook.Sheets[sheetName];
-      const data = XLSX.utils.sheet_to_json(worksheet);
-      
-      return {
-        sheetName,
-        rowCount: data.length,
-        columns: data.length > 0 ? Object.keys(data[0]) : [],
-        preview: data
-      };
-    });
-
-    // ลบไฟล์ชั่วคราว
-    fs.unlinkSync(tempFilePath);
-
-    res.json({
-      success: true,
-      data: {
-        fileName: file.fileName,
-        sheets
-      }
-    });
-
-  } catch (error) {
-    console.error('Read file error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'เกิดข้อผิดพลาดในการอ่านไฟล์: ' + error.message
-    });
-  }
-};
 
 // เปลี่ยนชื่อไฟล์ใน Supabase Storage (ไม่รองรับในปัจจุบัน)
 const renameFile = async (req, res) => {
@@ -392,6 +334,5 @@ module.exports = {
   uploadFile,
   getUploadedFiles,
   deleteFile,
-  readFileData,
   renameFile
 };

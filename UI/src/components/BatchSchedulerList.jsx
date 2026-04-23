@@ -374,6 +374,14 @@ const BatchSchedulerList = ({ isOpen, onClose, onEdit }) => {
                         </div>
                         <div>
                           <div className="text-xs text-gray-600 mb-1">
+                            🎯 ประเภท Batch
+                          </div>
+                          <div className="text-sm font-semibold text-gray-900">
+                            {scheduler.filterType === "JOB_ONLY" ? " เฉพาะอีเมลสมัครงาน" : scheduler.filterType === "ALL" ? " ดึงอีเมลทั้งหมด" : "-"}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-600 mb-1">
                             ⏰ กำหนดการ
                           </div>
                           <div className="text-sm font-semibold text-gray-900">
@@ -441,7 +449,7 @@ const BatchSchedulerList = ({ isOpen, onClose, onEdit }) => {
                       >
                         <Check className="w-3.5 h-3.5" />
                         {scheduler.isActive
-                          ? "เลือก Scheduler แล้ว"
+                          ? "ยกเลิก Scheduler"
                           : "เลือก Scheduler"}
                       </button>
                       <button

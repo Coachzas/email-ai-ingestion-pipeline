@@ -10,13 +10,14 @@ class StorageService {
 
   // Generate safe storage filename using UUID
   generateStorageFileName(originalFileName) {
-    if (!originalFileName) return `unknown_${crypto.randomUUID()}.bin`;
+    if (!originalFileName) return 'unknown_file';
     
-    const ext = path.extname(originalFileName) || '.bin';
+    const ext = path.extname(originalFileName);
     const uuid = crypto.randomUUID();
+    const timestamp = Date.now();
     
-    // ใช้เฉพาะ UUID + extension เพื่อป้องกันการซ้ำ
-    return `${uuid}${ext}`;
+    // ใช้ UUID + timestamp + extension เป็นชื่อไฟล์ใน storage
+    return `${timestamp}_${uuid}${ext}`;
   }
 
   // Create safe storage path
@@ -25,7 +26,7 @@ class StorageService {
     return `${userId}/${storageFileName}`;
   }
 
-  // Upload file to Supabase Storage
+  // Upload file to Supabase
   async uploadFile(fileName, userId, mimeType = null, buffer = null) {
     try {
       // Create safe storage path
@@ -37,15 +38,25 @@ class StorageService {
         fileBuffer = buffer;
       } else {
         // Read file from local path
-        const filePath = fileName; // assuming fileName is the local path
+        const filePath = fileName; // assuming fileName is local path
         fileBuffer = fs.readFileSync(filePath);
+      }
+      
+      // Ensure proper Content-Type for Supabase
+      let contentType = mimeType || 'application/octet-stream';
+      
+      // Handle specific file types
+      if (fileName.includes('.csv')) {
+        contentType = 'text/csv';
+      } else if (fileName.includes('.xlsx') || fileName.includes('.xls')) {
+        contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
       }
       
       // Upload to Supabase
       const { data, error } = await supabase.storage
         .from(this.bucketName)
         .upload(storagePath, fileBuffer, {
-          contentType: mimeType || 'application/octet-stream',
+          contentType: contentType,
           upsert: false
         });
 
@@ -86,8 +97,19 @@ class StorageService {
         throw error;
       }
 
+      // Convert Blob to Buffer before writing
+      let fileData;
+      if (data instanceof Blob) {
+        // Convert Blob to Buffer
+        const arrayBuffer = await data.arrayBuffer();
+        fileData = Buffer.from(arrayBuffer);
+      } else {
+        // Already a Buffer or string
+        fileData = data;
+      }
+      
       // Save to local path
-      fs.writeFileSync(localPath, data);
+      fs.writeFileSync(localPath, fileData);
 
       console.log(`✅ File downloaded: ${storagePath} -> ${localPath}`);
       return localPath;
@@ -177,6 +199,26 @@ class StorageService {
 
     } catch (error) {
       console.error('Migration error:', error);
+      throw error;
+    }
+  }
+
+  // Get file info
+  async getFileInfo(storagePath) {
+    try {
+      const { data, error } = await supabase.storage
+        .from(this.bucketName)
+        .list(storagePath.split('/').slice(0, -1).join('/'));
+
+      if (error) throw error;
+
+      const fileName = storagePath.split('/').pop();
+      const fileInfo = data.find(file => file.name === fileName);
+
+      return fileInfo;
+
+    } catch (error) {
+      console.error('Get file info error:', error);
       throw error;
     }
   }

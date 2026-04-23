@@ -10,6 +10,7 @@ const BatchSchedulerModal = ({ isOpen, onClose, onSave, editScheduler }) => {
     customMinute: 0,
     startDate: new Date().toISOString().split("T")[0],
     endDate: "",
+    filterType: "ALL", // 'ALL', 'JOB_ONLY'
     // Custom schedule fields
     selectedDays: [], // ['MONDAY', 'TUESDAY', ...]
     dayTimeSlots: {}, // New: Per-day time slots {"MONDAY": [{hour: 9, minute: 0}], "TUESDAY": [...]}
@@ -36,6 +37,7 @@ const BatchSchedulerModal = ({ isOpen, onClose, onSave, editScheduler }) => {
         customMinute: editScheduler.customMinute || 0,
         startDate: editScheduler.startDate ? new Date(editScheduler.startDate).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
         endDate: editScheduler.endDate ? new Date(editScheduler.endDate).toISOString().split("T")[0] : "",
+        filterType: editScheduler.filterType || "ALL",
         // Custom schedule fields - will be parsed from existing data or defaults
         selectedDays: editScheduler.selectedDays || [],
         dayTimeSlots: editScheduler.dayTimeSlots || {},
@@ -50,6 +52,7 @@ const BatchSchedulerModal = ({ isOpen, onClose, onSave, editScheduler }) => {
         customMinute: 0,
         startDate: new Date().toISOString().split('T')[0],
         endDate: "",
+        filterType: "ALL",
         selectedDays: [],
         dayTimeSlots: {}
       };
@@ -427,6 +430,40 @@ const BatchSchedulerModal = ({ isOpen, onClose, onSave, editScheduler }) => {
               </p>
             </div>
 
+            {/* Email Filter Type */}
+            <div className="mb-6">
+              <label className="form-label">🎯 ประเภทอีเมลที่ดึง</label>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="filterType"
+                    value="ALL"
+                    checked={formData.filterType === "ALL"}
+                    onChange={(e) => setFormData({ ...formData, filterType: e.target.value })}
+                    className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  />
+                  <span className="text-gray-700">ดึงอีเมลทั้งหมด</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="filterType"
+                    value="JOB_ONLY"
+                    checked={formData.filterType === "JOB_ONLY"}
+                    onChange={(e) => setFormData({ ...formData, filterType: e.target.value })}
+                    className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  />
+                  <span className="text-gray-700">เฉพาะอีเมลสมัครงาน</span>
+                </label>
+              </div>
+              <div className="mt-2 text-sm text-gray-600">
+                {formData.filterType === "JOB_ONLY" 
+                  ? "🔍 จะดึงเฉพาะอีเมลสมัครงานที่มีคำว่า 'สมัครงาน', 'Resume', 'CV', 'Job Application'" 
+                  : "📧 จะดึงอีเมลทั้งหมดตามช่วงวันที่กำหนด"}
+              </div>
+            </div>
+
             {/* Batch Size */}
             <div className="mb-6">
               <label className="form-label">📦 Batch Size (อีเมลต่อรอบ)</label>
@@ -714,6 +751,10 @@ const BatchSchedulerModal = ({ isOpen, onClose, onSave, editScheduler }) => {
                 <div className="text-gray-700">
                   <strong className="text-blue-800">Batch Size:</strong>{" "}
                   {formData.batchSize} อีเมล/รอบ
+                </div>
+                <div className="text-gray-700">
+                  <strong className="text-blue-800">ประเภทอีเมล:</strong>{" "}
+                  {formData.filterType === "JOB_ONLY" ? "🔍 เฉพาะอีเมลสมัครงาน" : "📧 ดึงอีเมลทั้งหมด"}
                 </div>
                 <div className="text-gray-700">
                   <strong className="text-blue-800">กำหนดเวลา:</strong>{" "}
